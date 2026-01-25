@@ -1,0 +1,407 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import Link from 'next/link'
+import { Ban, ExternalLink, Lock, Trash2, Unlock } from 'lucide-react'
+
+type AdminUser = {
+  id: string
+  name: string | null
+  email: string | null
+  role: 'super_user' | 'admin' | 'normal'
+  suspended: boolean
+  pollsCount: number
+  votesCount: number
+}
+
+type AdminPoll = {
+  id: string
+  title: string
+  uniqueLink: string
+  status: 'active' | 'closed' | 'draft'
+  creatorName: string | null
+  creatorEmail: string | null
+  slotsCount: number
+  participantsCount: number
+  votesCount: number
+}
+
+type AdminStats = {
+  users: number
+  polls: number
+  slots: number
+  participants: number
+  votes: number
+}
+
+type AdminNonUser = {
+  email: string
+  name: string | null
+  pollsVoted: number
+}
+
+export function AdminClient({ data }: { data: string }) {
+  const parsed = JSON.parse(data) as {
+    users: AdminUser[]
+    nonUsers: AdminNonUser[]
+    polls: AdminPoll[]
+    stats: AdminStats
+  }
+  const { users, nonUsers, polls, stats } = parsed
+  const router = useRouter()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [userQuery, setUserQuery] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'super_user' | 'normal' | 'suspended'>('all')
+  const [pollQuery, setPollQuery] = useState('')
+  const [pollOwnerQuery, setPollOwnerQuery] = useState('')
+  const [pollStatusFilter, setPollStatusFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
+
+  const mutate = async (id: string, action: () => Promise<Response>, confirmText?: string) => {
+    if (confirmText && !window.confirm(confirmText)) return
+    setBusy(id)
+    try {
+      const res = await action()
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Request failed')
+      }
+      router.refresh()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Request failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const filteredUsers = useMemo(() => {
+    const query = userQuery.trim().toLowerCase()
+    return users.filter((user) => {
+      if (userRoleFilter === 'suspended' && !user.suspended) return false
+      if (userRoleFilter === 'super_user' && user.role !== 'super_user') return false
+      if (userRoleFilter === 'normal' && user.role !== 'normal') return false
+
+      if (!query) return true
+      const haystack = `${user.name || ''} ${user.email || ''}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [users, userQuery, userRoleFilter])
+
+  const filteredPolls = useMemo(() => {
+    const query = pollQuery.trim().toLowerCase()
+    const ownerQuery = pollOwnerQuery.trim().toLowerCase()
+    return polls.filter((poll) => {
+      if (pollStatusFilter !== 'all' && poll.status !== pollStatusFilter) return false
+      if (query) {
+        const text = `${poll.title}`.toLowerCase()
+        if (!text.includes(query)) return false
+      }
+      if (ownerQuery) {
+        const owner = `${poll.creatorName || ''} ${poll.creatorEmail || ''}`.toLowerCase()
+        if (!owner.includes(ownerQuery)) return false
+      }
+      return true
+    })
+  }, [polls, pollQuery, pollOwnerQuery, pollStatusFilter])
+
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {[
+          { label: 'Users', value: stats.users },
+          { label: 'Polls', value: stats.polls },
+          { label: 'Slots', value: stats.slots },
+          { label: 'Participants', value: stats.participants },
+          { label: 'Votes', value: stats.votes },
+        ].map((item) => (
+          <Card key={item.label}>
+            <CardHeader>
+              <CardDescription>{item.label}</CardDescription>
+              <CardTitle className="text-2xl">{item.value}</CardTitle>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Users</CardTitle>
+          <CardDescription>Manage user roles and access</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search name or email"
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              className="max-w-xs"
+            />
+            <select
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+              value={userRoleFilter}
+              onChange={(e) => setUserRoleFilter(e.target.value as typeof userRoleFilter)}
+            >
+              <option value="all">All roles</option>
+              <option value="super_user">Super users</option>
+              <option value="normal">Normal users</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+          <div className="grid gap-3">
+            {filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px_minmax(260px,auto)] md:items-center"
+              >
+                <div>
+                  <div className="font-medium">{user.name || 'No name'}</div>
+                  <div className="text-xs text-muted-foreground">{user.email || 'No email'}</div>
+                </div>
+                <div className="text-xs text-muted-foreground md:text-center">
+                  {user.pollsCount} polls • {user.votesCount} polls voted
+                </div>
+                <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+                  <span
+                    className={[
+                      'rounded-full border px-2 py-1 text-xs',
+                      user.role === 'super_user' && 'border-purple-200 bg-purple-50 text-purple-700',
+                      user.role === 'admin' && 'border-blue-200 bg-blue-50 text-blue-700',
+                      user.role === 'normal' && 'border-slate-200 bg-slate-50 text-slate-700',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {user.role}
+                  </span>
+                  {user.suspended && (
+                    <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+                      suspended
+                    </span>
+                  )}
+                  {user.role !== 'super_user' && user.role !== 'normal' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy === `role-${user.id}`}
+                      onClick={() =>
+                        mutate(
+                          `role-${user.id}`,
+                          () =>
+                            fetch(`/api/admin/users/${user.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ role: 'normal' }),
+                            }),
+                          'Set user to normal role?'
+                        )
+                      }
+                    >
+                      Make normal
+                    </Button>
+                  )}
+                  {user.role !== 'super_user' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={
+                        user.suspended
+                          ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                          : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
+                      }
+                      disabled={busy === `suspend-${user.id}`}
+                      onClick={() =>
+                        mutate(
+                          `suspend-${user.id}`,
+                          () =>
+                            fetch(`/api/admin/users/${user.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ suspended: !user.suspended }),
+                            }),
+                          user.suspended ? 'Unsuspend this user?' : 'Suspend this user?'
+                        )
+                      }
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      {user.suspended ? 'Unsuspend' : 'Suspend'}
+                    </Button>
+                  )}
+                  {user.role !== 'super_user' && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy === `delete-${user.id}`}
+                      onClick={() =>
+                        mutate(
+                          `delete-${user.id}`,
+                          () => fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }),
+                          'Delete this user and all their polls/votes?'
+                        )
+                      }
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Participants (no account)</CardTitle>
+          <CardDescription>Emails that voted but don’t have user accounts</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {nonUsers.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No external participants yet.</div>
+          ) : (
+            <div className="grid gap-3">
+              {nonUsers.map((participant) => (
+                <div
+                  key={participant.email}
+                  className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px] md:items-center"
+                >
+                  <div>
+                    <div className="font-medium">{participant.name || 'No name'}</div>
+                    <div className="text-xs text-muted-foreground">{participant.email}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground md:text-center">
+                    {participant.pollsVoted} polls voted
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Polls</CardTitle>
+          <CardDescription>Manage all polls</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search title"
+              value={pollQuery}
+              onChange={(e) => setPollQuery(e.target.value)}
+              className="max-w-xs"
+            />
+            <Input
+              placeholder="Filter owner"
+              value={pollOwnerQuery}
+              onChange={(e) => setPollOwnerQuery(e.target.value)}
+              className="max-w-xs"
+            />
+            <select
+              className="h-10 rounded-md border bg-background px-3 text-sm"
+              value={pollStatusFilter}
+              onChange={(e) => setPollStatusFilter(e.target.value as typeof pollStatusFilter)}
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+              <option value="draft">Draft</option>
+            </select>
+          </div>
+          <div className="grid gap-3">
+            {filteredPolls.map((poll) => (
+              <div key={poll.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                <div className="min-w-[240px]">
+                  <div className="font-medium">{poll.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {poll.creatorName || poll.creatorEmail || 'Unknown owner'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {poll.slotsCount} slots • {poll.participantsCount} responses • {poll.votesCount} votes
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={[
+                      'rounded-full border px-2 py-1 text-xs',
+                      poll.status === 'active' && 'border-green-200 bg-green-50 text-green-700',
+                      poll.status === 'closed' && 'border-slate-200 bg-slate-50 text-slate-700',
+                      poll.status === 'draft' && 'border-amber-200 bg-amber-50 text-amber-700',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {poll.status}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={
+                      poll.status === 'closed'
+                        ? 'border-green-300 bg-green-600 text-white hover:bg-green-700'
+                        : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
+                    }
+                    disabled={busy === `status-${poll.id}`}
+                    onClick={() =>
+                      mutate(
+                        `status-${poll.id}`,
+                        () =>
+                          fetch(`/api/admin/polls/${poll.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: poll.status === 'closed' ? 'active' : 'closed' }),
+                          }),
+                        poll.status === 'closed' ? 'Reopen this poll?' : 'Close this poll?'
+                      )
+                    }
+                  >
+                    {poll.status === 'closed' ? (
+                      <>
+                        <Unlock className="mr-2 h-4 w-4" />
+                        Reopen
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="mr-2 h-4 w-4" />
+                        Close
+                      </>
+                    )}
+                  </Button>
+                  <Link
+                    href={`/polls/${poll.uniqueLink}`}
+                    className={[
+                      buttonVariants({ variant: 'outline', size: 'sm' }),
+                      'border-green-300 bg-green-600 text-white hover:bg-green-700',
+                    ].join(' ')}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open
+                  </Link>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy === `delete-${poll.id}`}
+                    onClick={() =>
+                      mutate(
+                        `delete-${poll.id}`,
+                        () => fetch(`/api/admin/polls/${poll.id}`, { method: 'DELETE' }),
+                        'Delete this poll and all votes?'
+                      )
+                    }
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

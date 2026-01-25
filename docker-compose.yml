@@ -1,0 +1,108 @@
+services:
+  traefik:
+    image: traefik:v3.2
+    container_name: slotpoll_traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/dynamic:/dynamic:ro
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - slotpoll_network
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+    container_name: slotpoll_app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=postgresql://${DB_USER:-slotpoll}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-slotpoll}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://slotpoll.localhost}
+      - REDIS_URL=redis://redis:6379
+      - APP_URL=${APP_URL:-https://slotpoll.localhost}
+      - SUPER_USER_EMAIL=${SUPER_USER_EMAIL}
+      - EMAIL_FROM=${EMAIL_FROM}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - slotpoll_network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: slotpoll_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-slotpoll}
+      - POSTGRES_USER=${DB_USER:-slotpoll}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - slotpoll_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-slotpoll}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: slotpoll_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass}
+    volumes:
+      - redis_data:/data
+    networks:
+      - slotpoll_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local
+    container_name: slotpoll_backup
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${DB_NAME:-slotpoll}
+      - POSTGRES_USER=${DB_USER:-slotpoll}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - slotpoll_network
+
+networks:
+  slotpoll_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
