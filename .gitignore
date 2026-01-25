@@ -44,8 +44,7 @@ docker-compose.override.yml
 traefik/acme.json
 
 # Database backups
-backups/*.sql
-backups/*.gz
+backups/**
 
 # Misc
 *.swp
