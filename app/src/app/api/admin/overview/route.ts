@@ -127,7 +127,50 @@ export async function GET() {
       }
     }
 
+    const demoPoll = await db.query.polls.findFirst({
+      where: eq(polls.uniqueLink, 'demo'),
+    })
+    let demoParticipants: { email: string; name: string | null; pollsVoted: number; lastSeen: Date }[] = []
+    if (demoPoll) {
+      const demoRows = await db.query.participants.findMany({
+        where: eq(participants.pollId, demoPoll.id),
+        columns: {
+          email: true,
+          name: true,
+          createdAt: true,
+        },
+      })
+      const demoMap = new Map<string, { email: string; name: string | null; lastSeen: Date }>()
+      for (const row of demoRows) {
+        const email = row.email?.toLowerCase()
+        if (!email) continue
+        const existing = demoMap.get(email)
+        if (!existing) {
+          demoMap.set(email, {
+            email: row.email!,
+            name: row.name || null,
+            lastSeen: row.createdAt,
+          })
+          continue
+        }
+        if (row.createdAt > existing.lastSeen) {
+          existing.lastSeen = row.createdAt
+          existing.name = row.name || existing.name
+        }
+      }
+      demoParticipants = Array.from(demoMap.values())
+        .sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime())
+        .map((entry) => ({
+          email: entry.email,
+          name: entry.name,
+          pollsVoted: 1,
+          lastSeen: entry.lastSeen,
+        }))
+    }
+    const demoEmails = new Set(demoParticipants.map((entry) => entry.email.toLowerCase()))
+
     const nonUserParticipants = Array.from(participantMap.values())
+      .filter((entry) => !demoEmails.has(entry.email.toLowerCase()))
       .sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime())
       .slice(0, 200)
       .map((entry) => ({
@@ -225,6 +268,7 @@ export async function GET() {
     const payload = {
       users: usersWithCounts,
       nonUsers: nonUserParticipants,
+      demoParticipants,
       polls: pollsForAdmin,
       stats: {
         users: Number(usersCount?.count ?? 0),

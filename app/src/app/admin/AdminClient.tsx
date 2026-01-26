@@ -48,10 +48,11 @@ export function AdminClient({ data }: { data: string }) {
   const parsed = JSON.parse(data) as {
     users: AdminUser[]
     nonUsers: AdminNonUser[]
+    demoParticipants: AdminNonUser[]
     polls: AdminPoll[]
     stats: AdminStats
   }
-  const { users, nonUsers, polls, stats } = parsed
+  const { users, nonUsers, demoParticipants, polls, stats } = parsed
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [userQuery, setUserQuery] = useState('')
@@ -250,6 +251,35 @@ export function AdminClient({ data }: { data: string }) {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Demo poll participants</CardTitle>
+          <CardDescription>External emails that voted in the demo poll</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {demoParticipants.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No demo participants yet.</div>
+          ) : (
+            <div className="grid gap-3">
+              {demoParticipants.map((participant) => (
+                <div
+                  key={`demo-${participant.email}`}
+                  className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px] md:items-center"
+                >
+                  <div>
+                    <div className="font-medium">{participant.name || 'No name'}</div>
+                    <div className="text-xs text-muted-foreground">{participant.email}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground md:text-center">
+                    {participant.pollsVoted} polls voted
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

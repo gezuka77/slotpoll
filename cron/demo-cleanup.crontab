@@ -1,0 +1,5 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TZ=UTC
+
+0 0 * * * /usr/local/bin/demo-cleanup.sh >> /var/log/demo-cleanup.log 2>&1

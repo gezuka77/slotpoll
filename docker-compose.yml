@@ -35,11 +35,29 @@ services:
       - APP_URL=${APP_URL:-https://slotpoll.localhost}
       - SUPER_USER_EMAIL=${SUPER_USER_EMAIL}
       - EMAIL_FROM=${EMAIL_FROM}
+      - DEMO_CLEANUP_TOKEN=${DEMO_CLEANUP_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - slotpoll_network
+
+  demo-cleanup:
+    image: alpine:3.20
+    container_name: slotpoll_demo_cleanup
+    restart: unless-stopped
+    environment:
+      - DEMO_CLEANUP_TOKEN=${DEMO_CLEANUP_TOKEN}
+      - TZ=UTC
+    volumes:
+      - ./cron/demo-cleanup.sh:/usr/local/bin/demo-cleanup.sh:ro
+      - ./cron/demo-cleanup.crontab:/etc/crontabs/root:ro
+    command: sh -c "apk add --no-cache curl && crond -f -l 8"
+    depends_on:
+      app:
+        condition: service_started
     networks:
       - slotpoll_network
 
