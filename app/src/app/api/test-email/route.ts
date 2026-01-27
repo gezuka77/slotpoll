@@ -7,7 +7,7 @@ export async function GET() {
 
     const result = await resend.emails.send({
       from: process.env.EMAIL_FROM || 'SlotPoll <noreply@yourdomain.com>',
-      to: 'REDACTED@example.com',
+      to: 'contact@yourdomain.com',
       subject: 'Test Email from SlotPoll',
       html: '<p>This is a test email to verify Resend configuration.</p>',
     })

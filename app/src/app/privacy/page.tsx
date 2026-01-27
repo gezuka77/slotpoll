@@ -14,7 +14,7 @@ export default function PrivacyPage() {
             <div>
               <div className="font-medium text-foreground">Controller</div>
               <div>SlotPoll</div>
-              <div>REDACTED@example.com</div>
+              <div>contact@yourdomain.com</div>
             </div>
             <div>
               <div className="font-medium text-foreground">Hosting and data location</div>
@@ -43,6 +43,13 @@ export default function PrivacyPage() {
                 session and CSRF cookies). We do not use advertising or analytics cookies. Because
                 these cookies are strictly necessary, consent banners are not required, but we
                 disclose their use here.
+              </div>
+            </div>
+            <div>
+              <div className="font-medium text-foreground">Email policy</div>
+              <div>
+                We only send transactional emails required to operate the service (such as sign‑in
+                links and poll notifications). We do not send marketing or promotional emails.
               </div>
             </div>
             <div>
@@ -79,7 +86,7 @@ export default function PrivacyPage() {
               <div className="font-medium text-foreground">Your rights</div>
               <div>
                 You can request access, correction, deletion, or restriction of your data by
-                contacting us at REDACTED@example.com.
+                contacting us at contact@yourdomain.com.
               </div>
             </div>
             <div>

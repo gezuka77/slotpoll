@@ -14,7 +14,7 @@ export default function LegalNoticePage() {
             <div>
               <div className="font-medium text-foreground">Service provider</div>
               <div>SlotPoll</div>
-              <div>REDACTED@example.com</div>
+              <div>contact@yourdomain.com</div>
             </div>
             <div>
               <div className="font-medium text-foreground">Hosting</div>
@@ -28,7 +28,7 @@ export default function LegalNoticePage() {
             <div>
               <div className="font-medium text-foreground">Contact for notices</div>
               <div>
-                For legal or privacy notices, contact SlotPoll at REDACTED@example.com.
+                For legal or privacy notices, contact SlotPoll at contact@yourdomain.com.
               </div>
             </div>
             <div>
