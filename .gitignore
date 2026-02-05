@@ -51,3 +51,15 @@ backups/**
 *.swo
 *~
 codex.md
+
+# Claude and local AI tools
+.claude/
+.cursor/
+.continue/
+.aider*
+.copilot/
+
+# Local system files
+.cache/
+.config/
+.local/

@@ -23,7 +23,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    await db.update(polls).set({ status }).where(eq(polls.id, pollId))
+    // Get current poll to check if status is changing
+    const poll = await db.query.polls.findFirst({
+      where: eq(polls.id, pollId),
+    })
+
+    if (!poll) {
+      return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
+    }
+
+    const updates: { status: 'active' | 'closed'; closedAt?: Date | null } = { status }
+
+    // Set closedAt timestamp when closing a poll
+    if (status === 'closed' && poll.status !== 'closed') {
+      updates.closedAt = new Date()
+    }
+    // Clear closedAt when reopening a poll
+    if (status === 'active' && poll.status === 'closed') {
+      updates.closedAt = null
+    }
+
+    await db.update(polls).set(updates).where(eq(polls.id, pollId))
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error updating poll status:', error)

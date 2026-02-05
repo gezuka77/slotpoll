@@ -103,7 +103,7 @@ export function PollOwnerControls({
   }
 
   const handleClose = async () => {
-    if (!window.confirm('Close this poll? People will no longer be able to vote.')) {
+    if (!window.confirm('Close this poll? People will no longer be able to vote.\n\nThe poll will be automatically deleted 30 days after closing for GDPR compliance.')) {
       return
     }
     setClosing(true)

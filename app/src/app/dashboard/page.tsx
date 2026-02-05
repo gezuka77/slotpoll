@@ -10,6 +10,15 @@ import Link from 'next/link'
 import { Plus, Calendar, Users, MapPin, User } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
+function getDaysUntilDeletion(closedAt: Date | null): number | null {
+  if (!closedAt) return null
+  const deletionDate = new Date(closedAt)
+  deletionDate.setDate(deletionDate.getDate() + 30)
+  const now = new Date()
+  const daysRemaining = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return daysRemaining
+}
+
 export default async function DashboardPage() {
   const user = await requireAuth()
 
@@ -121,7 +130,7 @@ export default async function DashboardPage() {
                     <div className="mt-2 text-xs text-muted-foreground">
                       Created {formatDateTime(poll.createdAt)}
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           poll.status === 'active'
@@ -133,6 +142,22 @@ export default async function DashboardPage() {
                       >
                         {poll.status}
                       </span>
+                      {poll.status === 'closed' && poll.closedAt && (() => {
+                        const daysRemaining = getDaysUntilDeletion(poll.closedAt)
+                        if (daysRemaining === null) return null
+                        if (daysRemaining <= 0) {
+                          return (
+                            <span className="text-xs text-red-600 font-medium">
+                              ⚠️ Deletion pending
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className={`text-xs ${daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+                            🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -141,12 +166,17 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div className="mt-10">
+        {/* Separator */}
+        <div className="my-12 border-t border-border"></div>
+
+        <div className="mb-4">
           <h2 className="text-2xl font-semibold">Polls You Voted In</h2>
-          <p className="text-muted-foreground mb-4">
+          <p className="text-muted-foreground">
             Polls you participated in as a voter.
           </p>
-          {normalizedEmail === null ? (
+        </div>
+
+        {normalizedEmail === null ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 Add an email to your profile to see polls you&apos;ve voted in.
@@ -191,7 +221,7 @@ export default async function DashboardPage() {
                     <div className="mt-2 text-xs text-muted-foreground">
                       Created {formatDateTime(poll.createdAt)}
                     </div>
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                             poll.status === 'active'
@@ -203,6 +233,22 @@ export default async function DashboardPage() {
                         >
                           {poll.status}
                         </span>
+                        {poll.status === 'closed' && poll.closedAt && (() => {
+                          const daysRemaining = getDaysUntilDeletion(poll.closedAt)
+                          if (daysRemaining === null) return null
+                          if (daysRemaining <= 0) {
+                            return (
+                              <span className="text-xs text-red-600 font-medium">
+                                ⚠️ Deletion pending
+                              </span>
+                            )
+                          }
+                          return (
+                            <span className={`text-xs ${daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+                              🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                            </span>
+                          )
+                        })()}
                       </div>
                     </CardContent>
                   </Card>
@@ -210,7 +256,6 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
       </main>
     </div>
   )

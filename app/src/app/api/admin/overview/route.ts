@@ -189,6 +189,7 @@ export async function GET() {
       slotsCount: poll.slots.length,
       participantsCount: poll.participants.length,
       votesCount: pollVotesMap.get(poll.id) || 0,
+      closedAt: poll.closedAt ? poll.closedAt.toISOString() : null,
     }))
 
     const topSlotsRaw = await db.execute(sql`

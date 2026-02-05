@@ -10,6 +10,9 @@ A lightweight, self-hosted alternative to Doodle for team scheduling and polling
 - 📧 Email notifications via Resend
 - 🔒 Secure authentication
 - 🐳 Docker-based deployment with Traefik
+- ⚖️ GDPR compliant with automatic data cleanup
+- 🗑️ Account deletion with data anonymization
+- 📋 90-day log retention policy
 
 ## Quick Start
 
@@ -109,6 +112,94 @@ docker-compose logs -f
 # Specific service
 docker-compose logs -f app
 ```
+
+## GDPR Compliance
+
+SlotPoll implements comprehensive GDPR compliance features:
+
+### Automatic Poll Deletion
+
+Polls are automatically deleted **30 days after they are closed** to comply with GDPR data retention requirements.
+
+**How It Works:**
+1. When a poll is closed, a `closedAt` timestamp is recorded
+2. A cleanup cron job runs daily at 2 AM UTC
+3. Polls closed for more than 30 days are permanently deleted
+4. All associated data (slots, votes, comments, participants) is removed via CASCADE
+
+### Account Deletion
+
+Users can delete their accounts at any time through the Account page.
+
+**What Happens:**
+- User account and authentication data are permanently deleted
+- All polls created by the user are deleted
+- Participation in other polls is **anonymized** (name becomes "Deleted User", email removed)
+- Votes are preserved to maintain poll integrity while removing personal information
+
+This balances the right to deletion with the legitimate interest of maintaining poll results.
+
+### Log Retention
+
+Security and application logs are automatically rotated and retained for **90 days**:
+- Daily log rotation with automatic compression
+- Old logs are automatically deleted after 90 days
+- Configured via logrotate for compliance with privacy policy
+
+### Setup Automated Cleanup
+
+For new deployments, run the one-time setup script:
+
+```bash
+# Install cron jobs, log rotation, and create log files
+./cron/setup.sh
+```
+
+This configures:
+- **GDPR cleanup**: Daily at 2 AM UTC - Deletes polls closed >30 days
+- **Demo cleanup**: Daily at midnight UTC - Resets demo poll
+- **Log rotation**: 90-day retention with automatic compression
+- **Reboot tasks**: Both jobs run 5 minutes after system restart
+
+**Verify installation:**
+```bash
+# View installed cron jobs
+crontab -l
+
+# View cleanup logs
+tail -f /var/log/gdpr-cleanup.log
+tail -f /var/log/demo-cleanup.log
+
+# Check log rotation config
+cat /etc/logrotate.d/slotpoll
+```
+
+### Alternative: GitHub Actions
+
+For cloud deployments, use the included workflow:
+- [.github/workflows/cleanup-polls.yml](.github/workflows/cleanup-polls.yml)
+- Add `DEMO_CLEANUP_TOKEN` to repository secrets
+- Runs daily at 2 AM UTC
+
+### Manual Cleanup
+
+Test or run cleanup manually:
+
+```bash
+# Dry run - check what would be deleted
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://slotpoll.yourdomain.com/api/cron/cleanup-polls
+
+# Execute cleanup
+curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
+  https://slotpoll.yourdomain.com/api/cron/cleanup-polls
+```
+
+**API Endpoints:**
+- `GET /api/cron/cleanup-polls` - Dry run (preview deletions)
+- `POST /api/cron/cleanup-polls` - Execute cleanup
+
+Both require `Authorization: Bearer DEMO_CLEANUP_TOKEN` header.
 
 ## User Roles
 

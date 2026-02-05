@@ -84,6 +84,7 @@ export const polls = pgTable('polls', {
   deadline: timestamp('deadline', { mode: 'date' }),
   maxVotesPerParticipant: integer('maxVotesPerParticipant'),
   password: text('password'),
+  closedAt: timestamp('closedAt', { mode: 'date' }),
   createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
 })

@@ -6,7 +6,7 @@ import { Header } from '@/components/header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PollVotingForm } from '@/components/poll-voting-form'
 import { PollResults } from '@/components/poll-results'
-import { Calendar, MapPin, User, Clock, Users } from 'lucide-react'
+import { Calendar, MapPin, User, Clock, Users, AlertCircle } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/session'
 import { ShareLinkButton } from '@/components/share-link-button'
 import { PollOwnerControls } from './PollOwnerControls'
@@ -35,6 +35,15 @@ function buildDemoSlots(base: Date) {
     slotsToCreate.push({ startTime: new Date(afternoon), endTime: endAfternoon })
   }
   return slotsToCreate
+}
+
+function getDaysUntilDeletion(closedAt: Date | null): number | null {
+  if (!closedAt) return null
+  const deletionDate = new Date(closedAt)
+  deletionDate.setDate(deletionDate.getDate() + 30)
+  const now = new Date()
+  const daysRemaining = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return daysRemaining
 }
 
 export default async function PollPage({ params }: { params: Promise<{ uniqueLink: string }> }) {
@@ -220,8 +229,38 @@ export default async function PollPage({ params }: { params: Promise<{ uniqueLin
           </Card>
         </div>
 
+        {/* Deletion countdown banner for closed polls */}
+        {poll.status === 'closed' && poll.closedAt && (() => {
+          const daysRemaining = getDaysUntilDeletion(poll.closedAt)
+          if (daysRemaining === null) return null
+
+          return (
+            <div className="mx-auto max-w-5xl mt-6">
+              <Card className={`border-2 ${daysRemaining <= 7 ? 'border-amber-500 bg-amber-50' : daysRemaining <= 0 ? 'border-red-500 bg-red-50' : 'border-blue-500 bg-blue-50'}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className={`h-5 w-5 mt-0.5 ${daysRemaining <= 7 ? 'text-amber-600' : daysRemaining <= 0 ? 'text-red-600' : 'text-blue-600'}`} />
+                    <div className="flex-1">
+                      <h3 className={`font-semibold mb-1 ${daysRemaining <= 7 ? 'text-amber-900' : daysRemaining <= 0 ? 'text-red-900' : 'text-blue-900'}`}>
+                        {daysRemaining <= 0 ? 'Poll Deletion Pending' : 'Poll Will Be Deleted Soon'}
+                      </h3>
+                      <p className={`text-sm ${daysRemaining <= 7 ? 'text-amber-800' : daysRemaining <= 0 ? 'text-red-800' : 'text-blue-800'}`}>
+                        {daysRemaining <= 0 ? (
+                          <>This poll is scheduled for automatic deletion. It was closed and will be permanently removed for GDPR compliance.</>
+                        ) : (
+                          <>This poll will be automatically deleted in <strong>{daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}</strong> for GDPR compliance (30 days after closing). {isCreator && 'You can reopen the poll to reset the deletion timer.'}</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )
+        })()}
+
         {isCreator && (
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-5xl mt-6">
             <PollOwnerControls
               pollId={poll.id}
               status={poll.status}

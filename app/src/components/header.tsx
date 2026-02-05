@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { Calendar, Plus } from 'lucide-react'
+import { Calendar, Plus, User, LayoutDashboard, ShieldCheck, LogOut } from 'lucide-react'
 
 export function Header() {
   const { data: session } = useSession()
@@ -20,7 +20,10 @@ export function Header() {
           {session ? (
             <>
               <Link href="/dashboard">
-                <Button variant="ghost">Dashboard</Button>
+                <Button variant="ghost">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Dashboard
+                </Button>
               </Link>
               <Link href="/polls/create">
                 <Button variant="ghost">
@@ -28,9 +31,18 @@ export function Header() {
                   Create Poll
                 </Button>
               </Link>
+              <Link href="/account">
+                <Button variant="ghost">
+                  <User className="mr-2 h-4 w-4" />
+                  Account
+                </Button>
+              </Link>
               {session.user.role === 'super_user' && (
                 <Link href="/admin">
-                  <Button variant="ghost">Admin</Button>
+                  <Button variant="ghost">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Admin
+                  </Button>
                 </Link>
               )}
               <div className="flex items-center space-x-2">
@@ -38,6 +50,7 @@ export function Header() {
                   {session.user.email}
                 </span>
                 <Button variant="outline" onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
                   Sign Out
                 </Button>
               </div>

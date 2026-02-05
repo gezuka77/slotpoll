@@ -28,6 +28,7 @@ type AdminPoll = {
   slotsCount: number
   participantsCount: number
   votesCount: number
+  closedAt: string | null
 }
 
 type AdminStats = {
@@ -61,6 +62,16 @@ export function AdminClient({ data }: { data: string }) {
   const [pollOwnerQuery, setPollOwnerQuery] = useState('')
   const [pollStatusFilter, setPollStatusFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
 
+  const getDaysUntilDeletion = (closedAt: string | null): number | null => {
+    if (!closedAt) return null
+    const closedDate = new Date(closedAt)
+    const deletionDate = new Date(closedDate)
+    deletionDate.setDate(deletionDate.getDate() + 30)
+    const now = new Date()
+    const daysRemaining = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    return daysRemaining
+  }
+
   const mutate = async (id: string, action: () => Promise<Response>, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return
     setBusy(id)
@@ -70,10 +81,10 @@ export function AdminClient({ data }: { data: string }) {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error || 'Request failed')
       }
-      router.refresh()
+      // Reload the page to show updated data
+      window.location.reload()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Request failed')
-    } finally {
       setBusy(null)
     }
   }
@@ -353,6 +364,22 @@ export function AdminClient({ data }: { data: string }) {
                   <div className="text-xs text-muted-foreground">
                     {poll.slotsCount} slots • {poll.participantsCount} responses • {poll.votesCount} votes
                   </div>
+                  {poll.status === 'closed' && poll.closedAt && (
+                    <div className="mt-1 text-xs">
+                      {(() => {
+                        const daysRemaining = getDaysUntilDeletion(poll.closedAt)
+                        if (daysRemaining === null) return null
+                        if (daysRemaining <= 0) {
+                          return <span className="text-red-600 font-medium">⚠️ Deletion pending</span>
+                        }
+                        return (
+                          <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
+                            🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -367,40 +394,42 @@ export function AdminClient({ data }: { data: string }) {
                   >
                     {poll.status}
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={
-                      poll.status === 'closed'
-                        ? 'border-green-300 bg-green-600 text-white hover:bg-green-700'
-                        : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
-                    }
-                    disabled={busy === `status-${poll.id}`}
-                    onClick={() =>
-                      mutate(
-                        `status-${poll.id}`,
-                        () =>
-                          fetch(`/api/admin/polls/${poll.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: poll.status === 'closed' ? 'active' : 'closed' }),
-                          }),
-                        poll.status === 'closed' ? 'Reopen this poll?' : 'Close this poll?'
-                      )
-                    }
-                  >
-                    {poll.status === 'closed' ? (
-                      <>
-                        <Unlock className="mr-2 h-4 w-4" />
-                        Reopen
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="mr-2 h-4 w-4" />
-                        Close
-                      </>
-                    )}
-                  </Button>
+                  {poll.uniqueLink !== 'demo' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={
+                        poll.status === 'closed'
+                          ? 'border-green-300 bg-green-600 text-white hover:bg-green-700'
+                          : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
+                      }
+                      disabled={busy === `status-${poll.id}`}
+                      onClick={() =>
+                        mutate(
+                          `status-${poll.id}`,
+                          () =>
+                            fetch(`/api/admin/polls/${poll.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: poll.status === 'closed' ? 'active' : 'closed' }),
+                            }),
+                          poll.status === 'closed' ? 'Reopen this poll?' : 'Close this poll?'
+                        )
+                      }
+                    >
+                      {poll.status === 'closed' ? (
+                        <>
+                          <Unlock className="mr-2 h-4 w-4" />
+                          Reopen
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-2 h-4 w-4" />
+                          Close
+                        </>
+                      )}
+                    </Button>
+                  )}
                   <Link
                     href={`/polls/${poll.uniqueLink}`}
                     className={[
@@ -411,21 +440,23 @@ export function AdminClient({ data }: { data: string }) {
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open
                   </Link>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={busy === `delete-${poll.id}`}
-                    onClick={() =>
-                      mutate(
-                        `delete-${poll.id}`,
-                        () => fetch(`/api/admin/polls/${poll.id}`, { method: 'DELETE' }),
-                        'Delete this poll and all votes?'
-                      )
-                    }
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
+                  {poll.uniqueLink !== 'demo' && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy === `delete-${poll.id}`}
+                      onClick={() =>
+                        mutate(
+                          `delete-${poll.id}`,
+                          () => fetch(`/api/admin/polls/${poll.id}`, { method: 'DELETE' }),
+                          'Delete this poll and all votes?'
+                        )
+                      }
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

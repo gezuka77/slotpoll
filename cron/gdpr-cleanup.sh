@@ -8,12 +8,12 @@ fi
 
 # Try Docker internal hostname first, fall back to external URL
 if curl -sS -X POST --max-time 5 \
-  -H "x-demo-cleanup-token: ${DEMO_CLEANUP_TOKEN}" \
-  "http://app:3000/api/admin/demo/cleanup" 2>/dev/null; then
+  -H "Authorization: Bearer ${DEMO_CLEANUP_TOKEN}" \
+  "http://app:3000/api/cron/cleanup-polls" 2>/dev/null; then
   exit 0
 fi
 
 # Fall back to external URL
 curl -sS -X POST \
-  -H "x-demo-cleanup-token: ${DEMO_CLEANUP_TOKEN}" \
-  "https://slotpoll.yourdomain.com/api/admin/demo/cleanup"
+  -H "Authorization: Bearer ${DEMO_CLEANUP_TOKEN}" \
+  "https://slotpoll.yourdomain.com/api/cron/cleanup-polls"

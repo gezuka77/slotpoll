@@ -68,12 +68,22 @@ export default function PrivacyPage() {
               </div>
             </div>
             <div>
-              <div className="font-medium text-foreground">Retention</div>
-              <div>
-                Poll data is kept until the poll owner deletes it. Account data is kept while the
-                account is active. Security logs are retained for a limited period necessary for
-                security and troubleshooting.
-              </div>
+              <div className="font-medium text-foreground">Data retention</div>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <strong>Polls:</strong> Automatically deleted 30 days after being closed. This
+                  includes all associated data (time slots, votes, comments, and participant
+                  responses). Poll owners may manually delete polls at any time.
+                </li>
+                <li>
+                  <strong>Accounts:</strong> Kept while the account is active. You may delete your
+                  account at any time, which will remove all your personal data.
+                </li>
+                <li>
+                  <strong>Security logs:</strong> Retained for a limited period (typically 90 days)
+                  necessary for security monitoring and troubleshooting.
+                </li>
+              </ul>
             </div>
             <div>
               <div className="font-medium text-foreground">Security</div>
@@ -96,7 +106,7 @@ export default function PrivacyPage() {
                 authority.
               </div>
             </div>
-            <div>Last updated: January 25, 2026.</div>
+            <div>Last updated: February 3, 2026.</div>
           </CardContent>
         </Card>
       </main>

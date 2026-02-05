@@ -14,7 +14,7 @@ fi
 
 # Backup database
 echo "📦 Creating backup..."
-./scripts/backup-db.sh
+docker compose exec postgres pg_dump -U slotpoll slotpoll > backups/backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Install dependencies
 echo "📦 Installing dependencies..."

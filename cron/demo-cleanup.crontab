@@ -2,4 +2,15 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=UTC
 
+# Load environment variables
+DEMO_CLEANUP_TOKEN=REDACTED_TOKEN
+
+# Demo poll cleanup - runs daily at midnight UTC
 0 0 * * * /usr/local/bin/demo-cleanup.sh >> /var/log/demo-cleanup.log 2>&1
+
+# GDPR poll cleanup - runs daily at 2 AM UTC (delete polls closed >30 days)
+0 2 * * * /usr/local/bin/gdpr-cleanup.sh >> /var/log/gdpr-cleanup.log 2>&1
+
+# Run both cleanups on system reboot (with 5 minute delay)
+@reboot sleep 300 && /usr/local/bin/demo-cleanup.sh >> /var/log/demo-cleanup.log 2>&1
+@reboot sleep 300 && /usr/local/bin/gdpr-cleanup.sh >> /var/log/gdpr-cleanup.log 2>&1

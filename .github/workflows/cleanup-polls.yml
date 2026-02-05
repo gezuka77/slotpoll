@@ -1,0 +1,45 @@
+name: GDPR Poll Cleanup
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  cleanup:
+    name: Delete polls closed >30 days ago
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call cleanup endpoint
+        env:
+          CLEANUP_TOKEN: ${{ secrets.DEMO_CLEANUP_TOKEN }}
+          APP_URL: https://slotpoll.yourdomain.com
+        run: |
+          echo "Running GDPR cleanup for polls closed >30 days ago..."
+
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "Authorization: Bearer $CLEANUP_TOKEN" \
+            "$APP_URL/api/cron/cleanup-polls")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+
+          echo "Response: $BODY"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Error: Cleanup failed with status $HTTP_STATUS"
+            exit 1
+          fi
+
+          # Extract deleted count
+          DELETED=$(echo "$BODY" | grep -o '"deleted":[0-9]*' | cut -d':' -f2 || echo "0")
+
+          echo "✓ Cleanup successful"
+          echo "Deleted $DELETED polls"
+
+      - name: Send notification on failure
+        if: failure()
+        run: |
+          echo "::error::GDPR cleanup job failed. Check the logs above for details."

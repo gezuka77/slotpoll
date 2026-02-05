@@ -46,11 +46,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const updates: { status?: 'active' | 'closed'; title?: string; description?: string | null; location?: string | null } =
-      {}
+    const updates: {
+      status?: 'active' | 'closed';
+      title?: string;
+      description?: string | null;
+      location?: string | null;
+      closedAt?: Date | null;
+    } = {}
 
     if (status && (status === 'active' || status === 'closed')) {
       updates.status = status
+      // Set closedAt timestamp when closing a poll
+      if (status === 'closed' && poll.status !== 'closed') {
+        updates.closedAt = new Date()
+      }
+      // Clear closedAt when reopening a poll
+      if (status === 'active' && poll.status === 'closed') {
+        updates.closedAt = null
+      }
     }
     if (typeof title === 'string') {
       const trimmed = title.trim()

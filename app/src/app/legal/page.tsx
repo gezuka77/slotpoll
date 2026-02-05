@@ -55,7 +55,20 @@ export default function LegalNoticePage() {
                 bypass security measures. Abuse may result in suspension or termination.
               </div>
             </div>
-            <div>Last updated: January 25, 2026.</div>
+            <div>
+              <div className="font-medium text-foreground">Data retention and GDPR compliance</div>
+              <div>
+                In compliance with GDPR data minimization principles, SlotPoll automatically deletes
+                polls 30 days after they are closed. This ensures that personal data (participant
+                names, emails, and responses) is not retained longer than necessary. Poll owners may
+                manually delete polls at any time. See our{' '}
+                <a href="/privacy" className="text-primary hover:underline">
+                  Privacy Policy
+                </a>{' '}
+                for complete data retention information.
+              </div>
+            </div>
+            <div>Last updated: February 3, 2026.</div>
           </CardContent>
         </Card>
       </main>
