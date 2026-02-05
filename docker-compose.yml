@@ -53,6 +53,7 @@ services:
       - TZ=UTC
     volumes:
       - ./cron/demo-cleanup.sh:/usr/local/bin/demo-cleanup.sh:ro
+      - ./cron/gdpr-cleanup.sh:/usr/local/bin/gdpr-cleanup.sh:ro
       - ./cron/demo-cleanup.crontab:/etc/crontabs/root:ro
     command: sh -c "apk add --no-cache curl && printenv > /etc/environment && crond -f -l 8"
     depends_on:
