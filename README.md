@@ -47,11 +47,14 @@ openssl rand -base64 32
 htpasswd -nb admin your_password
 ```
 
-4. Create Traefik acme.json:
+4. Set up Traefik config files:
 ```bash
+cp traefik/traefik.yml.example traefik/traefik.yml
+cp traefik/dynamic/slotpoll.yml.example traefik/dynamic/slotpoll.yml
 touch traefik/acme.json
 chmod 600 traefik/acme.json
 ```
+Edit both `.yml` files with your domain, email, and dashboard password.
 
 5. Start services:
 ```bash
