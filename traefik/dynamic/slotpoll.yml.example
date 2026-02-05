@@ -1,7 +1,7 @@
 http:
   routers:
     slotpoll:
-      rule: "Host(`your-domain.example.com`)"
+      rule: "Host(`slotpoll.yourdomain.com`)"
       service: slotpoll-service
       entryPoints:
         - websecure
@@ -11,7 +11,7 @@ http:
         - secure-headers
 
     traefik-dashboard:
-      rule: "Host(`traefik.your-domain.example.com`)"
+      rule: "Host(`traefik.slotpoll.yourdomain.com`)"
       service: api@internal
       entryPoints:
         - websecure
