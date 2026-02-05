@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { Heart } from 'lucide-react'
 
 export function Footer() {
   return (
@@ -19,6 +20,15 @@ export function Footer() {
           <Link href="/privacy" className="text-muted-foreground hover:text-foreground">
             Privacy/cookie policy
           </Link>
+          <a
+            href="https://github.com/sponsors/gezuka77"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-pink-500"
+          >
+            <Heart className="h-4 w-4" />
+            Sponsor
+          </a>
         </nav>
       </div>
     </footer>
