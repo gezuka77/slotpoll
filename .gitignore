@@ -42,6 +42,7 @@ docker-compose.override.yml
 
 # Traefik
 traefik/acme.json
+traefik/traefik.yml
 traefik/dynamic/slotpoll.yml
 
 # Database backups
