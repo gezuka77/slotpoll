@@ -1,0 +1,39 @@
+http:
+  routers:
+    slotpoll:
+      rule: "Host(`slotpoll.yourdomain.com`)"
+      service: slotpoll-service
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - secure-headers
+
+    traefik-dashboard:
+      rule: "Host(`traefik.slotpoll.yourdomain.com`)"
+      service: api@internal
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - dashboard-auth
+
+  services:
+    slotpoll-service:
+      loadBalancer:
+        servers:
+          - url: "http://slotpoll_app:3000"
+
+  middlewares:
+    secure-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Ssl: "on"
+    dashboard-auth:
+      basicAuth:
+        users:
+          # Generate with: htpasswd -nb admin YOUR_PASSWORD
+          - "admin:$apr1$CHANGE_ME"

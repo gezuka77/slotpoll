@@ -54,7 +54,7 @@ services:
     volumes:
       - ./cron/demo-cleanup.sh:/usr/local/bin/demo-cleanup.sh:ro
       - ./cron/demo-cleanup.crontab:/etc/crontabs/root:ro
-    command: sh -c "apk add --no-cache curl && crond -f -l 8"
+    command: sh -c "apk add --no-cache curl && printenv > /etc/environment && crond -f -l 8"
     depends_on:
       app:
         condition: service_started
@@ -85,7 +85,7 @@ services:
     image: redis:7-alpine
     container_name: slotpoll_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
