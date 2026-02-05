@@ -26,7 +26,7 @@ export function Footer() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-pink-500"
           >
-            <Heart className="h-4 w-4" />
+            <Heart className="h-4 w-4 text-pink-500" />
             Sponsor
           </a>
         </nav>
