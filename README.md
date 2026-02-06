@@ -177,13 +177,6 @@ tail -f /var/log/demo-cleanup.log
 cat /etc/logrotate.d/slotpoll
 ```
 
-### Alternative: GitHub Actions
-
-For cloud deployments, use the included workflow:
-- [.github/workflows/cleanup-polls.yml](.github/workflows/cleanup-polls.yml)
-- Add `DEMO_CLEANUP_TOKEN` to repository secrets
-- Runs daily at 2 AM UTC
-
 ### Manual Cleanup
 
 Test or run cleanup manually:
