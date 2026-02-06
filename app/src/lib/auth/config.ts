@@ -61,13 +61,18 @@ export const authOptions: NextAuthOptions = {
         .map((value) => value.trim().toLowerCase())
         .filter(Boolean)
 
-      if (user.email && superUserEmails.includes(user.email.toLowerCase())) {
+      if (user.email) {
         const dbUser = await db.query.users.findFirst({
           where: eq(users.email, user.email),
         })
 
-        if (dbUser && dbUser.role !== 'super_user') {
-          await db.update(users).set({ role: 'super_user' }).where(eq(users.id, dbUser.id))
+        if (dbUser) {
+          const isSuperEmail = superUserEmails.includes(user.email.toLowerCase())
+          if (isSuperEmail && dbUser.role !== 'super_user') {
+            await db.update(users).set({ role: 'super_user' }).where(eq(users.id, dbUser.id))
+          } else if (!isSuperEmail && dbUser.role === 'super_user') {
+            await db.update(users).set({ role: 'normal' }).where(eq(users.id, dbUser.id))
+          }
         }
       }
       return true
