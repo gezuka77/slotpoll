@@ -16,4 +16,4 @@ fi
 # Fall back to external URL
 curl -sS -X POST \
   -H "x-demo-cleanup-token: ${DEMO_CLEANUP_TOKEN}" \
-  "https://slotpoll.yourdomain.com/api/admin/demo/cleanup"
+  "${APP_URL}/api/admin/demo/cleanup"

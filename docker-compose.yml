@@ -50,6 +50,7 @@ services:
     restart: unless-stopped
     environment:
       - DEMO_CLEANUP_TOKEN=${DEMO_CLEANUP_TOKEN}
+      - APP_URL=${APP_URL:-https://slotpoll.localhost}
       - TZ=UTC
     volumes:
       - ./cron/demo-cleanup.sh:/usr/local/bin/demo-cleanup.sh:ro

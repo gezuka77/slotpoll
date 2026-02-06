@@ -16,4 +16,4 @@ fi
 # Fall back to external URL
 curl -sS -X POST \
   -H "Authorization: Bearer ${DEMO_CLEANUP_TOKEN}" \
-  "https://slotpoll.yourdomain.com/api/cron/cleanup-polls"
+  "${APP_URL}/api/cron/cleanup-polls"

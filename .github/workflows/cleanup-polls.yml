@@ -15,7 +15,7 @@ jobs:
       - name: Call cleanup endpoint
         env:
           CLEANUP_TOKEN: ${{ secrets.DEMO_CLEANUP_TOKEN }}
-          APP_URL: https://slotpoll.yourdomain.com
+          APP_URL: ${{ vars.APP_URL }}
         run: |
           echo "Running GDPR cleanup for polls closed >30 days ago..."
 
