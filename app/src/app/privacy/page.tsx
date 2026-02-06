@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   const appName = process.env.APP_NAME || 'SlotPoll'
   const contactEmail = process.env.LEGAL_CONTACT_EMAIL || 'contact@yourdomain.com'
   const hostingProvider = process.env.HOSTING_PROVIDER || 'Your Hosting Provider'
-  const serverLocation = process.env.SERVER_LOCATION || 'Finland'
+  const serverLocation = process.env.SERVER_LOCATION || 'Your Country'
 
   return (
     <div className="min-h-screen">

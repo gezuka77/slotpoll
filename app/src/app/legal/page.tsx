@@ -7,8 +7,8 @@ export default function LegalNoticePage() {
   const appName = process.env.APP_NAME || 'SlotPoll'
   const contactEmail = process.env.LEGAL_CONTACT_EMAIL || 'contact@yourdomain.com'
   const hostingProvider = process.env.HOSTING_PROVIDER || 'Your Hosting Provider'
-  const serverLocation = process.env.SERVER_LOCATION || 'Finland'
-  const jurisdiction = process.env.LEGAL_JURISDICTION || 'Finland'
+  const serverLocation = process.env.SERVER_LOCATION || 'Your Country'
+  const jurisdiction = process.env.LEGAL_JURISDICTION || 'Your Country'
   const jurisdictionCity = process.env.LEGAL_JURISDICTION_CITY || 'Your City, Your Country'
 
   return (
