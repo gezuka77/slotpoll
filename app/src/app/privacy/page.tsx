@@ -1,7 +1,14 @@
 import { Header } from '@/components/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+export const dynamic = 'force-dynamic'
+
 export default function PrivacyPage() {
+  const appName = process.env.APP_NAME || 'SlotPoll'
+  const contactEmail = process.env.LEGAL_CONTACT_EMAIL || 'contact@yourdomain.com'
+  const hostingProvider = process.env.HOSTING_PROVIDER || 'Your Hosting Provider'
+  const serverLocation = process.env.SERVER_LOCATION || 'Finland'
+
   return (
     <div className="min-h-screen">
       <Header />
@@ -13,13 +20,13 @@ export default function PrivacyPage() {
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div>
               <div className="font-medium text-foreground">Controller</div>
-              <div>SlotPoll</div>
-              <div>contact@yourdomain.com</div>
+              <div>{appName}</div>
+              <div>{contactEmail}</div>
             </div>
             <div>
               <div className="font-medium text-foreground">Hosting and data location</div>
-              <div>Your Hosting Provider (hosting provider).</div>
-              <div>Server location: Finland (EU/EEA).</div>
+              <div>{hostingProvider} (hosting provider).</div>
+              <div>Server location: {serverLocation} (EU/EEA).</div>
             </div>
             <div>
               <div className="font-medium text-foreground">What data we process</div>
@@ -39,7 +46,7 @@ export default function PrivacyPage() {
             <div>
               <div className="font-medium text-foreground">Cookies</div>
               <div>
-                SlotPoll uses essential cookies required for authentication and security (e.g.,
+                {appName} uses essential cookies required for authentication and security (e.g.,
                 session and CSRF cookies). We do not use advertising or analytics cookies. Because
                 these cookies are strictly necessary, consent banners are not required, but we
                 disclose their use here.
@@ -55,7 +62,7 @@ export default function PrivacyPage() {
             <div>
               <div className="font-medium text-foreground">International transfers</div>
               <div>
-                Data is hosted in Finland. We do not intentionally transfer personal data outside
+                Data is hosted in {serverLocation}. We do not intentionally transfer personal data outside
                 the EU/EEA. If an EU/EEA transfer becomes necessary (e.g., to a service provider),
                 we will use appropriate safeguards.
               </div>
@@ -96,7 +103,7 @@ export default function PrivacyPage() {
               <div className="font-medium text-foreground">Your rights</div>
               <div>
                 You can request access, correction, deletion, or restriction of your data by
-                contacting us at contact@yourdomain.com.
+                contacting us at {contactEmail}.
               </div>
             </div>
             <div>
