@@ -32,6 +32,15 @@ http:
         customRequestHeaders:
           X-Forwarded-Proto: "https"
           X-Forwarded-Ssl: "on"
+        customResponseHeaders:
+          X-Powered-By: ""
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
     dashboard-auth:
       basicAuth:
         users:
