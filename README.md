@@ -159,6 +159,7 @@ The admin dashboard separates aggregate statistics from retained personal data:
 - **Lifetime**: Anonymous aggregate totals. When GDPR cleanup or manual deletion removes rows, only counters are retained.
 - **Active**: Currently retained active data (for users, active non-suspended accounts).
 - **Online now**: Users whose `lastSeenAt` timestamp was updated within the last 5 minutes.
+- **Seen today / this week / this month**: Active users whose latest authenticated activity happened in that UTC period.
 - **Scheduled deletion**: Closed polls and their associated slots, participants, and votes that are waiting for the 30-day deletion timer.
 
 Detailed admin lists show only currently retained records and do not keep deleted poll, participant, or voter details.

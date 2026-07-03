@@ -15,6 +15,14 @@ export async function GET() {
 
     const deletedStats = await getDeletedEntityCounts()
     const onlineSince = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const todayStart = new Date()
+    todayStart.setUTCHours(0, 0, 0, 0)
+    const weekStart = new Date(todayStart)
+    weekStart.setUTCDate(todayStart.getUTCDate() - todayStart.getUTCDay())
+    const monthStart = new Date(Date.UTC(todayStart.getUTCFullYear(), todayStart.getUTCMonth(), 1))
+    const todayStartIso = todayStart.toISOString()
+    const weekStartIso = weekStart.toISOString()
+    const monthStartIso = monthStart.toISOString()
     const [usersCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users)
     const [activeUsersCount] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -24,6 +32,18 @@ export async function GET() {
       .select({ count: sql<number>`count(*)::int` })
       .from(users)
       .where(and(eq(users.suspended, false), sql`${users.lastSeenAt} >= ${onlineSince}::timestamp`))
+    const [usersSeenTodayCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(eq(users.suspended, false), sql`${users.lastSeenAt} >= ${todayStartIso}::timestamp`))
+    const [usersSeenThisWeekCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(eq(users.suspended, false), sql`${users.lastSeenAt} >= ${weekStartIso}::timestamp`))
+    const [usersSeenThisMonthCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(eq(users.suspended, false), sql`${users.lastSeenAt} >= ${monthStartIso}::timestamp`))
     const [pollsCount] = await db.select({ count: sql<number>`count(*)::int` }).from(polls)
     const [activePollsCount] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -329,6 +349,9 @@ export async function GET() {
           lifetime: Number(usersCount?.count ?? 0) + deletedStats.deletedUsers,
           active: Number(activeUsersCount?.count ?? 0),
           online: Number(onlineUsersCount?.count ?? 0),
+          seenToday: Number(usersSeenTodayCount?.count ?? 0),
+          seenThisWeek: Number(usersSeenThisWeekCount?.count ?? 0),
+          seenThisMonth: Number(usersSeenThisMonthCount?.count ?? 0),
           scheduledDeletion: 0,
         },
         polls: {

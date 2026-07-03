@@ -45,6 +45,9 @@ type AdminMetricStats = {
   lifetime: number
   active: number
   online?: number
+  seenToday?: number
+  seenThisWeek?: number
+  seenThisMonth?: number
   scheduledDeletion: number
 }
 
@@ -173,6 +176,24 @@ export function AdminClient({ data }: { data: string }) {
                   <div className="flex justify-between gap-3">
                     <span>Online now</span>
                     <span className="font-medium text-foreground">{item.value.online}</span>
+                  </div>
+                )}
+                {typeof item.value.seenToday === 'number' && (
+                  <div className="flex justify-between gap-3">
+                    <span>Seen today</span>
+                    <span className="font-medium text-foreground">{item.value.seenToday}</span>
+                  </div>
+                )}
+                {typeof item.value.seenThisWeek === 'number' && (
+                  <div className="flex justify-between gap-3">
+                    <span>Seen this week</span>
+                    <span className="font-medium text-foreground">{item.value.seenThisWeek}</span>
+                  </div>
+                )}
+                {typeof item.value.seenThisMonth === 'number' && (
+                  <div className="flex justify-between gap-3">
+                    <span>Seen this month</span>
+                    <span className="font-medium text-foreground">{item.value.seenThisMonth}</span>
                   </div>
                 )}
                 <div className="flex justify-between gap-3">

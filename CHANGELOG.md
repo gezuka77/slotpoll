@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.0 - 2026-07-03
+
+### Added
+- Add admin user activity counts for users online now, seen today, seen this week, and seen this month.
+
 ## v1.1.1 - 2026-07-03
 
 ### Added
