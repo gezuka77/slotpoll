@@ -14,6 +14,7 @@ type AdminUser = {
   email: string | null
   role: 'super_user' | 'admin' | 'normal'
   suspended: boolean
+  lastSeenAt: string | null
   pollsCount: number
   votesCount: number
 }
@@ -29,14 +30,22 @@ type AdminPoll = {
   participantsCount: number
   votesCount: number
   closedAt: string | null
+  autoClosedAt: string | null
 }
 
 type AdminStats = {
-  users: number
-  polls: number
-  slots: number
-  participants: number
-  votes: number
+  users: AdminMetricStats
+  polls: AdminMetricStats
+  slots: AdminMetricStats
+  participants: AdminMetricStats
+  votes: AdminMetricStats
+}
+
+type AdminMetricStats = {
+  lifetime: number
+  active: number
+  online?: number
+  scheduledDeletion: number
 }
 
 type AdminNonUser = {
@@ -57,7 +66,7 @@ export function AdminClient({ data }: { data: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [userQuery, setUserQuery] = useState('')
-  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'super_user' | 'normal' | 'suspended'>('all')
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'super_user' | 'normal' | 'suspended' | 'online'>('all')
   const [pollQuery, setPollQuery] = useState('')
   const [pollOwnerQuery, setPollOwnerQuery] = useState('')
   const [pollStatusFilter, setPollStatusFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
@@ -70,6 +79,23 @@ export function AdminClient({ data }: { data: string }) {
     const now = new Date()
     const daysRemaining = Math.ceil((deletionDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     return daysRemaining
+  }
+
+  const isOnline = (lastSeenAt: string | null) => {
+    if (!lastSeenAt) return false
+    return Date.now() - new Date(lastSeenAt).getTime() <= 5 * 60 * 1000
+  }
+
+  const formatLastSeen = (lastSeenAt: string | null) => {
+    if (!lastSeenAt) return 'Never seen'
+    const date = new Date(lastSeenAt)
+    const diffMs = Date.now() - date.getTime()
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    if (diffMinutes < 1) return 'Just now'
+    if (diffMinutes < 60) return `${diffMinutes} min ago`
+    const diffHours = Math.floor(diffMinutes / 60)
+    if (diffHours < 24) return `${diffHours} hr ago`
+    return date.toLocaleString()
   }
 
   const mutate = async (id: string, action: () => Promise<Response>, confirmText?: string) => {
@@ -93,6 +119,7 @@ export function AdminClient({ data }: { data: string }) {
     const query = userQuery.trim().toLowerCase()
     return users.filter((user) => {
       if (userRoleFilter === 'suspended' && !user.suspended) return false
+      if (userRoleFilter === 'online' && !isOnline(user.lastSeenAt)) return false
       if (userRoleFilter === 'super_user' && user.role !== 'super_user') return false
       if (userRoleFilter === 'normal' && user.role !== 'normal') return false
 
@@ -123,16 +150,36 @@ export function AdminClient({ data }: { data: string }) {
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Users', value: stats.users },
-          { label: 'Polls', value: stats.polls },
-          { label: 'Slots', value: stats.slots },
-          { label: 'Participants', value: stats.participants },
-          { label: 'Votes', value: stats.votes },
+          { label: 'Users', activeLabel: 'Active', value: stats.users },
+          { label: 'Polls', activeLabel: 'Active', value: stats.polls },
+          { label: 'Slots', activeLabel: 'Active', value: stats.slots },
+          { label: 'Participants', activeLabel: 'Active', value: stats.participants },
+          { label: 'Votes', activeLabel: 'Active', value: stats.votes },
         ].map((item) => (
           <Card key={item.label}>
             <CardHeader>
               <CardDescription>{item.label}</CardDescription>
-              <CardTitle className="text-2xl">{item.value}</CardTitle>
+              <CardTitle className="text-2xl">{item.value.lifetime}</CardTitle>
+              <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                <div className="flex justify-between gap-3">
+                  <span>Lifetime</span>
+                  <span className="font-medium text-foreground">{item.value.lifetime}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>{item.activeLabel}</span>
+                  <span className="font-medium text-foreground">{item.value.active}</span>
+                </div>
+                {typeof item.value.online === 'number' && (
+                  <div className="flex justify-between gap-3">
+                    <span>Online now</span>
+                    <span className="font-medium text-foreground">{item.value.online}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3">
+                  <span>Scheduled deletion</span>
+                  <span className="font-medium text-foreground">{item.value.scheduledDeletion}</span>
+                </div>
+              </div>
             </CardHeader>
           </Card>
         ))}
@@ -141,7 +188,7 @@ export function AdminClient({ data }: { data: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Users</CardTitle>
-          <CardDescription>Manage user roles and access</CardDescription>
+          <CardDescription>Current retained user accounts. Lifetime totals above are anonymous aggregates.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -160,6 +207,7 @@ export function AdminClient({ data }: { data: string }) {
               <option value="super_user">Super users</option>
               <option value="normal">Normal users</option>
               <option value="suspended">Suspended</option>
+              <option value="online">Online now</option>
             </select>
           </div>
           <div className="grid gap-3">
@@ -171,6 +219,9 @@ export function AdminClient({ data }: { data: string }) {
                 <div>
                   <div className="font-medium">{user.name || 'No name'}</div>
                   <div className="text-xs text-muted-foreground">{user.email || 'No email'}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Last seen: {formatLastSeen(user.lastSeenAt)}
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground md:text-center">
                   {user.pollsCount} polls • {user.votesCount} polls voted
@@ -191,6 +242,11 @@ export function AdminClient({ data }: { data: string }) {
                   {user.suspended && (
                     <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
                       suspended
+                    </span>
+                  )}
+                  {isOnline(user.lastSeenAt) && !user.suspended && (
+                    <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-700">
+                      online
                     </span>
                   )}
                   {user.role !== 'super_user' && user.role !== 'normal' && (
@@ -297,7 +353,7 @@ export function AdminClient({ data }: { data: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Participants (no account)</CardTitle>
-          <CardDescription>Emails that voted but don’t have user accounts</CardDescription>
+          <CardDescription>Current retained participant emails that voted but don’t have user accounts</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {nonUsers.length === 0 ? (
@@ -326,7 +382,7 @@ export function AdminClient({ data }: { data: string }) {
       <Card>
         <CardHeader>
           <CardTitle>Polls</CardTitle>
-          <CardDescription>Manage all polls</CardDescription>
+          <CardDescription>Current retained polls. Closed polls with deletion timers are counted as scheduled deletion above.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -373,9 +429,16 @@ export function AdminClient({ data }: { data: string }) {
                           return <span className="text-red-600 font-medium">⚠️ Deletion pending</span>
                         }
                         return (
-                          <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
-                            🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            {poll.autoClosedAt && (
+                              <span className="text-amber-700 font-medium">
+                                Automatically closed after all times passed
+                              </span>
+                            )}
+                            <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
+                              🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                            </span>
+                          </div>
                         )
                       })()}
                     </div>

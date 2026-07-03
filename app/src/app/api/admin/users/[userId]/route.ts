@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config'
 import { db } from '@/db'
 import { users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { recordUserRowsForDeletion } from '@/lib/lifetime-stats'
 
 export async function PATCH(
   request: NextRequest,
@@ -73,6 +74,7 @@ export async function DELETE(
     if (targetUser.role === 'super_user') {
       return NextResponse.json({ error: 'Cannot delete super user' }, { status: 403 })
     }
+    await recordUserRowsForDeletion(userId)
     await db.delete(users).where(eq(users.id, userId))
     return NextResponse.json({ success: true })
   } catch (error) {

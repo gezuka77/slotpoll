@@ -153,9 +153,16 @@ export default async function DashboardPage() {
                           )
                         }
                         return (
-                          <span className={`text-xs ${daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
-                            🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
-                          </span>
+                          <div className="flex flex-col gap-1 text-xs">
+                            {poll.autoClosedAt && (
+                              <span className="text-amber-700 font-medium">
+                                Automatically closed after all times passed
+                              </span>
+                            )}
+                            <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
+                              🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                            </span>
+                          </div>
                         )
                       })()}
                     </div>
@@ -244,9 +251,16 @@ export default async function DashboardPage() {
                             )
                           }
                           return (
-                            <span className={`text-xs ${daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
-                              🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
-                            </span>
+                            <div className="flex flex-col gap-1 text-xs">
+                              {poll.autoClosedAt && (
+                                <span className="text-amber-700 font-medium">
+                                  Automatically closed after all times passed
+                                </span>
+                              )}
+                              <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
+                                🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                              </span>
+                            </div>
                           )
                         })()}
                       </div>

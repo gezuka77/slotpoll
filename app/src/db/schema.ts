@@ -25,6 +25,7 @@ export const users = pgTable('user', {
   image: text('image'),
   role: userRoleEnum('role').notNull().default('normal'),
   suspended: boolean('suspended').notNull().default(false),
+  lastSeenAt: timestamp('lastSeenAt', { mode: 'date' }),
   createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
 })
@@ -85,6 +86,7 @@ export const polls = pgTable('polls', {
   maxVotesPerParticipant: integer('maxVotesPerParticipant'),
   password: text('password'),
   closedAt: timestamp('closedAt', { mode: 'date' }),
+  autoClosedAt: timestamp('autoClosedAt', { mode: 'date' }),
   createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
 })
@@ -131,6 +133,16 @@ export const comments = pgTable('comments', {
     .references(() => participants.id, { onDelete: 'cascade' }),
   content: text('content').notNull(),
   createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
+})
+
+export const lifetimeStats = pgTable('lifetimeStats', {
+  id: text('id').primaryKey(),
+  deletedUsers: integer('deletedUsers').notNull().default(0),
+  deletedPolls: integer('deletedPolls').notNull().default(0),
+  deletedSlots: integer('deletedSlots').notNull().default(0),
+  deletedParticipants: integer('deletedParticipants').notNull().default(0),
+  deletedVotes: integer('deletedVotes').notNull().default(0),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
 })
 
 // Relations
@@ -202,3 +214,4 @@ export type Vote = typeof votes.$inferSelect
 export type NewVote = typeof votes.$inferInsert
 export type Comment = typeof comments.$inferSelect
 export type NewComment = typeof comments.$inferInsert
+export type LifetimeStats = typeof lifetimeStats.$inferSelect

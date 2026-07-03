@@ -5,6 +5,7 @@ import { eq, and, sql } from 'drizzle-orm'
 import { checkRateLimit, isValidEmail } from '@/lib/security'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
+import { addDeletedEntityCounts } from '@/lib/lifetime-stats'
 
 export async function POST(
   request: NextRequest,
@@ -188,6 +189,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Vote not found' }, { status: 404 })
     }
 
+    const [voteCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(votes)
+      .where(eq(votes.participantId, participant.id))
+
+    await addDeletedEntityCounts({
+      deletedParticipants: 1,
+      deletedVotes: Number(voteCount?.count || 0),
+    })
     await db.delete(votes).where(eq(votes.participantId, participant.id))
     await db.delete(participants).where(eq(participants.id, participant.id))
 

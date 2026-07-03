@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/session'
 import { db } from '@/db'
 import { users, polls, participants, sessions, accounts } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { recordUserRowsForDeletion } from '@/lib/lifetime-stats'
 
 export async function DELETE() {
   try {
@@ -14,6 +15,7 @@ export async function DELETE() {
 
     const userId = user.id
     const userEmail = user.email
+    await recordUserRowsForDeletion(userId)
 
     // Step 1: Anonymize participant data for GDPR compliance
     // This preserves poll integrity while removing personal information

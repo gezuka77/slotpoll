@@ -233,6 +233,7 @@ export default async function PollPage({ params }: { params: Promise<{ uniqueLin
         {poll.status === 'closed' && poll.closedAt && (() => {
           const daysRemaining = getDaysUntilDeletion(poll.closedAt)
           if (daysRemaining === null) return null
+          const wasAutoClosed = Boolean(poll.autoClosedAt)
 
           return (
             <div className="mx-auto max-w-5xl mt-6">
@@ -242,11 +243,19 @@ export default async function PollPage({ params }: { params: Promise<{ uniqueLin
                     <AlertCircle className={`h-5 w-5 mt-0.5 ${daysRemaining <= 7 ? 'text-amber-600' : daysRemaining <= 0 ? 'text-red-600' : 'text-blue-600'}`} />
                     <div className="flex-1">
                       <h3 className={`font-semibold mb-1 ${daysRemaining <= 7 ? 'text-amber-900' : daysRemaining <= 0 ? 'text-red-900' : 'text-blue-900'}`}>
-                        {daysRemaining <= 0 ? 'Poll Deletion Pending' : 'Poll Will Be Deleted Soon'}
+                        {daysRemaining <= 0
+                          ? 'Poll Deletion Pending'
+                          : wasAutoClosed
+                          ? 'Poll Automatically Closed'
+                          : 'Poll Will Be Deleted Soon'}
                       </h3>
                       <p className={`text-sm ${daysRemaining <= 7 ? 'text-amber-800' : daysRemaining <= 0 ? 'text-red-800' : 'text-blue-800'}`}>
                         {daysRemaining <= 0 ? (
                           <>This poll is scheduled for automatic deletion. It was closed and will be permanently removed for GDPR compliance.</>
+                        ) : wasAutoClosed ? (
+                          <>
+                            This poll was automatically closed because all proposed times have passed. It will be deleted in <strong>{daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}</strong> for GDPR compliance. {isCreator && 'You can reopen the poll to add new times and reset the deletion timer.'}
+                          </>
                         ) : (
                           <>This poll will be automatically deleted in <strong>{daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}</strong> for GDPR compliance (30 days after closing). {isCreator && 'You can reopen the poll to reset the deletion timer.'}</>
                         )}

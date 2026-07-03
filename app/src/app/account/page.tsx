@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/header'
@@ -18,21 +18,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Loader2, Trash2, Save, User } from 'lucide-react'
+import { Loader2, Trash2, Save } from 'lucide-react'
 
 export default function AccountPage() {
-  const { data: session, update } = useSession()
+  const { data: session, status, update } = useSession()
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [name, setName] = useState(session?.user?.name || '')
+  const [name, setName] = useState('')
 
-  if (!session) {
-    router.push('/auth/signin')
-    return null
-  }
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin')
+    }
+  }, [router, status])
+
+  useEffect(() => {
+    if (session?.user?.name) {
+      setName(session.user.name)
+    }
+  }, [session?.user?.name])
 
   const handleSaveName = async () => {
     try {
@@ -84,6 +91,22 @@ export default function AccountPage() {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setIsDeleting(false)
     }
+  }
+
+  if (status === 'loading' || !session) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <main className="container mx-auto px-4 py-10 max-w-3xl">
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />
+              Loading account...
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
   }
 
   const hasNameChanged = name.trim() !== (session.user.name || '')

@@ -120,15 +120,18 @@ docker-compose logs -f app
 
 SlotPoll implements comprehensive GDPR compliance features:
 
-### Automatic Poll Deletion
+### Automatic Poll Closure and Deletion
 
-Polls are automatically deleted **30 days after they are closed** to comply with GDPR data retention requirements.
+Polls are automatically closed after all proposed times have passed, then deleted **30 days after they are closed** to comply with GDPR data retention requirements.
 
 **How It Works:**
-1. When a poll is closed, a `closedAt` timestamp is recorded
-2. A cleanup cron job runs daily at 2 AM UTC
-3. Polls closed for more than 30 days are permanently deleted
-4. All associated data (slots, votes, comments, participants) is removed via CASCADE
+1. A cleanup cron job runs daily at 2 AM UTC
+2. Active polls are automatically closed when their latest slot end time (or start time if no end time exists) passed more than 24 hours ago
+3. When a poll is closed, a `closedAt` timestamp is recorded
+4. Polls closed for more than 30 days are permanently deleted
+5. All associated data (slots, votes, comments, participants) is removed via CASCADE
+
+Poll owners can reopen an automatically closed poll to add new times. Reopening clears the deletion timer until the poll is closed again.
 
 ### Account Deletion
 
@@ -149,6 +152,19 @@ Security and application logs are automatically rotated and retained for **90 da
 - Old logs are automatically deleted after 90 days
 - Configured via logrotate for compliance with privacy policy
 
+### Admin Statistics
+
+The admin dashboard separates aggregate statistics from retained personal data:
+
+- **Lifetime**: Anonymous aggregate totals. When GDPR cleanup or manual deletion removes rows, only counters are retained.
+- **Active**: Currently retained active data (for users, active non-suspended accounts).
+- **Online now**: Users whose `lastSeenAt` timestamp was updated within the last 5 minutes.
+- **Scheduled deletion**: Closed polls and their associated slots, participants, and votes that are waiting for the 30-day deletion timer.
+
+Detailed admin lists show only currently retained records and do not keep deleted poll, participant, or voter details.
+
+For privacy, `lastSeenAt` stores only the latest authenticated activity timestamp. It does not store IP addresses, user agents, page URLs, or browsing history, and it is deleted with the user account.
+
 ### Setup Automated Cleanup
 
 For new deployments, run the one-time setup script:
@@ -159,7 +175,7 @@ For new deployments, run the one-time setup script:
 ```
 
 This configures:
-- **GDPR cleanup**: Daily at 2 AM UTC - Deletes polls closed >30 days
+- **GDPR cleanup**: Daily at 2 AM UTC - Auto-closes stale active polls and deletes polls closed >30 days
 - **Demo cleanup**: Daily at midnight UTC - Resets demo poll
 - **Log rotation**: 90-day retention with automatic compression
 - **Reboot tasks**: Both jobs run 5 minutes after system restart

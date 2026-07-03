@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config'
 import { db } from '@/db'
 import { polls, slots } from '@/db/schema'
 import { eq, inArray } from 'drizzle-orm'
+import { addDeletedEntityCounts, recordPollRowsForDeletion } from '@/lib/lifetime-stats'
 
 type SlotInput = {
   id?: string
@@ -52,6 +53,7 @@ export async function PATCH(
       description?: string | null;
       location?: string | null;
       closedAt?: Date | null;
+      autoClosedAt?: Date | null;
     } = {}
 
     if (status && (status === 'active' || status === 'closed')) {
@@ -59,10 +61,12 @@ export async function PATCH(
       // Set closedAt timestamp when closing a poll
       if (status === 'closed' && poll.status !== 'closed') {
         updates.closedAt = new Date()
+        updates.autoClosedAt = null
       }
       // Clear closedAt when reopening a poll
       if (status === 'active' && poll.status === 'closed') {
         updates.closedAt = null
+        updates.autoClosedAt = null
       }
     }
     if (typeof title === 'string') {
@@ -186,6 +190,7 @@ export async function PATCH(
         )
       }
       if (toDelete.length > 0) {
+        await addDeletedEntityCounts({ deletedSlots: toDelete.length })
         await db.delete(slots).where(inArray(slots.id, toDelete))
       }
 
@@ -268,6 +273,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    await recordPollRowsForDeletion([pollId])
     await db.delete(polls).where(eq(polls.id, pollId))
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -6,6 +6,8 @@ import { sendMagicLinkEmail } from '@/lib/email/templates'
 import { eq } from 'drizzle-orm'
 import { users, accounts, sessions, verificationTokens } from '@/db/schema'
 
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000
+
 export const authOptions: NextAuthOptions = {
   debug: process.env.NEXTAUTH_DEBUG === 'true',
   adapter: DrizzleAdapter(db, {
@@ -41,6 +43,14 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           session.user.role = dbUser.role
           session.user.suspended = dbUser.suspended
+
+          const now = new Date()
+          if (!dbUser.lastSeenAt || now.getTime() - dbUser.lastSeenAt.getTime() > LAST_SEEN_THROTTLE_MS) {
+            await db
+              .update(users)
+              .set({ lastSeenAt: now, updatedAt: now })
+              .where(eq(users.id, user.id))
+          }
         }
       }
       return session

@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { db } from '@/db'
 import { polls, users, slots, participants, votes } from '@/db/schema'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, sql } from 'drizzle-orm'
+import { getDeletedEntityCounts } from '@/lib/lifetime-stats'
 
 export async function GET() {
   try {
@@ -12,11 +13,61 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const [usersCount] = await db.select({ count: sql<number>`count(*)` }).from(users)
-    const [pollsCount] = await db.select({ count: sql<number>`count(*)` }).from(polls)
-    const [slotsCount] = await db.select({ count: sql<number>`count(*)` }).from(slots)
-    const [participantsCount] = await db.select({ count: sql<number>`count(*)` }).from(participants)
-    const [votesCount] = await db.select({ count: sql<number>`count(*)` }).from(votes)
+    const deletedStats = await getDeletedEntityCounts()
+    const onlineSince = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const [usersCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users)
+    const [activeUsersCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.suspended, false))
+    const [onlineUsersCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(and(eq(users.suspended, false), sql`${users.lastSeenAt} >= ${onlineSince}::timestamp`))
+    const [pollsCount] = await db.select({ count: sql<number>`count(*)::int` }).from(polls)
+    const [activePollsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(polls)
+      .where(eq(polls.status, 'active'))
+    const [scheduledPollsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(polls)
+      .where(and(eq(polls.status, 'closed'), isNotNull(polls.closedAt)))
+    const [slotsCount] = await db.select({ count: sql<number>`count(*)::int` }).from(slots)
+    const [activeSlotsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(slots)
+      .innerJoin(polls, eq(slots.pollId, polls.id))
+      .where(eq(polls.status, 'active'))
+    const [scheduledSlotsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(slots)
+      .innerJoin(polls, eq(slots.pollId, polls.id))
+      .where(and(eq(polls.status, 'closed'), isNotNull(polls.closedAt)))
+    const [participantsCount] = await db.select({ count: sql<number>`count(*)::int` }).from(participants)
+    const [activeParticipantsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(participants)
+      .innerJoin(polls, eq(participants.pollId, polls.id))
+      .where(eq(polls.status, 'active'))
+    const [scheduledParticipantsCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(participants)
+      .innerJoin(polls, eq(participants.pollId, polls.id))
+      .where(and(eq(polls.status, 'closed'), isNotNull(polls.closedAt)))
+    const [votesCount] = await db.select({ count: sql<number>`count(*)::int` }).from(votes)
+    const [activeVotesCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(votes)
+      .innerJoin(slots, eq(votes.slotId, slots.id))
+      .innerJoin(polls, eq(slots.pollId, polls.id))
+      .where(eq(polls.status, 'active'))
+    const [scheduledVotesCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(votes)
+      .innerJoin(slots, eq(votes.slotId, slots.id))
+      .innerJoin(polls, eq(slots.pollId, polls.id))
+      .where(and(eq(polls.status, 'closed'), isNotNull(polls.closedAt)))
 
     const userRows = await db.query.users.findMany({
       orderBy: [desc(users.createdAt)],
@@ -80,6 +131,7 @@ export async function GET() {
           email: user.email,
           role: user.role,
           suspended: user.suspended,
+          lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
           pollsCount: Number(pollsCreated?.count ?? 0),
           votesCount: votesCountValue,
         }
@@ -190,6 +242,7 @@ export async function GET() {
       participantsCount: poll.participants.length,
       votesCount: pollVotesMap.get(poll.id) || 0,
       closedAt: poll.closedAt ? poll.closedAt.toISOString() : null,
+      autoClosedAt: poll.autoClosedAt ? poll.autoClosedAt.toISOString() : null,
     }))
 
     const topSlotsRaw = await db.execute(sql`
@@ -272,11 +325,32 @@ export async function GET() {
       demoParticipants,
       polls: pollsForAdmin,
       stats: {
-        users: Number(usersCount?.count ?? 0),
-        polls: Number(pollsCount?.count ?? 0),
-        slots: Number(slotsCount?.count ?? 0),
-        participants: Number(participantsCount?.count ?? 0),
-        votes: Number(votesCount?.count ?? 0),
+        users: {
+          lifetime: Number(usersCount?.count ?? 0) + deletedStats.deletedUsers,
+          active: Number(activeUsersCount?.count ?? 0),
+          online: Number(onlineUsersCount?.count ?? 0),
+          scheduledDeletion: 0,
+        },
+        polls: {
+          lifetime: Number(pollsCount?.count ?? 0) + deletedStats.deletedPolls,
+          active: Number(activePollsCount?.count ?? 0),
+          scheduledDeletion: Number(scheduledPollsCount?.count ?? 0),
+        },
+        slots: {
+          lifetime: Number(slotsCount?.count ?? 0) + deletedStats.deletedSlots,
+          active: Number(activeSlotsCount?.count ?? 0),
+          scheduledDeletion: Number(scheduledSlotsCount?.count ?? 0),
+        },
+        participants: {
+          lifetime: Number(participantsCount?.count ?? 0) + deletedStats.deletedParticipants,
+          active: Number(activeParticipantsCount?.count ?? 0),
+          scheduledDeletion: Number(scheduledParticipantsCount?.count ?? 0),
+        },
+        votes: {
+          lifetime: Number(votesCount?.count ?? 0) + deletedStats.deletedVotes,
+          active: Number(activeVotesCount?.count ?? 0),
+          scheduledDeletion: Number(scheduledVotesCount?.count ?? 0),
+        },
       },
       topSlots,
       activity,

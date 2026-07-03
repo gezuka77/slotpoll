@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth/config'
 import { db } from '@/db'
 import { polls } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { recordPollRowsForDeletion } from '@/lib/lifetime-stats'
 
 export async function PATCH(
   request: NextRequest,
@@ -32,15 +33,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Poll not found' }, { status: 404 })
     }
 
-    const updates: { status: 'active' | 'closed'; closedAt?: Date | null } = { status }
+    const updates: { status: 'active' | 'closed'; closedAt?: Date | null; autoClosedAt?: Date | null } = { status }
 
     // Set closedAt timestamp when closing a poll
     if (status === 'closed' && poll.status !== 'closed') {
       updates.closedAt = new Date()
+      updates.autoClosedAt = null
     }
     // Clear closedAt when reopening a poll
     if (status === 'active' && poll.status === 'closed') {
       updates.closedAt = null
+      updates.autoClosedAt = null
     }
 
     await db.update(polls).set(updates).where(eq(polls.id, pollId))
@@ -62,6 +65,7 @@ export async function DELETE(
     }
 
     const { pollId } = await params
+    await recordPollRowsForDeletion([pollId])
     await db.delete(polls).where(eq(polls.id, pollId))
     return NextResponse.json({ success: true })
   } catch (error) {
