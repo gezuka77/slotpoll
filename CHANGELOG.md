@@ -22,3 +22,18 @@
 
 ### Fixed
 - Removed the `/account` prerender warning caused by redirecting during render.
+
+## v1.0.0 - 2026-02-07
+
+### Added
+- Initial production-ready SlotPoll release.
+- Poll creation, voting, admin management, and dashboard flows.
+- Email magic-link authentication.
+- Account management and GDPR deletion support.
+- Demo cleanup and GDPR cleanup jobs.
+- Health endpoint and safe error pages.
+
+### Security
+- Removed hardcoded credentials and deployment-specific domains from tracked files.
+- Added production hardening and dependency security updates.
+- Disabled `X-Powered-By`.
