@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { Footer } from '@/components/footer'
+import packageJson from '../../package.json'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,7 +27,7 @@ export default function RootLayout({
         <Providers>
           <div className="min-h-screen flex flex-col">
             <div className="flex-1">{children}</div>
-            <Footer />
+            <Footer version={packageJson.version} />
           </div>
         </Providers>
       </body>
