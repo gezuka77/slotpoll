@@ -6,6 +6,106 @@ import { polls, users, slots, participants, votes } from '@/db/schema'
 import { and, desc, eq, isNotNull, sql } from 'drizzle-orm'
 import { getDeletedEntityCounts } from '@/lib/lifetime-stats'
 
+type TrendPoint = {
+  label: string
+  value: number
+}
+
+type TrendRange = 'daily' | 'weekly' | 'monthly'
+
+const trendRanges: Record<TrendRange, { unit: 'day' | 'week' | 'month'; points: number }> = {
+  daily: { unit: 'day', points: 14 },
+  weekly: { unit: 'week', points: 12 },
+  monthly: { unit: 'month', points: 12 },
+}
+
+function getTrendStart(range: TrendRange) {
+  const now = new Date()
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const { unit, points } = trendRanges[range]
+
+  if (unit === 'week') {
+    const mondayOffset = (start.getUTCDay() + 6) % 7
+    start.setUTCDate(start.getUTCDate() - mondayOffset)
+    start.setUTCDate(start.getUTCDate() - (points - 1) * 7)
+    return start
+  }
+
+  if (unit === 'month') {
+    start.setUTCDate(1)
+    start.setUTCMonth(start.getUTCMonth() - (points - 1))
+    return start
+  }
+
+  start.setUTCDate(start.getUTCDate() - (points - 1))
+  return start
+}
+
+function addTrendUnit(date: Date, range: TrendRange, amount: number) {
+  const next = new Date(date)
+  const unit = trendRanges[range].unit
+  if (unit === 'month') next.setUTCMonth(next.getUTCMonth() + amount)
+  if (unit === 'week') next.setUTCDate(next.getUTCDate() + amount * 7)
+  if (unit === 'day') next.setUTCDate(next.getUTCDate() + amount)
+  return next
+}
+
+function getTrendKey(date: Date, range: TrendRange) {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  if (range === 'monthly') return `${year}-${month}`
+  return `${year}-${month}-${day}`
+}
+
+function getTrendLabel(date: Date, range: TrendRange) {
+  if (range === 'monthly') {
+    return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+  }
+  if (range === 'weekly') {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  }
+  return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })
+}
+
+async function getCreatedTrend(tableName: '"user"' | 'polls' | 'slots' | 'participants' | 'votes') {
+  const result: Record<TrendRange, TrendPoint[]> = {
+    daily: [],
+    weekly: [],
+    monthly: [],
+  }
+
+  for (const range of Object.keys(trendRanges) as TrendRange[]) {
+    const { unit, points } = trendRanges[range]
+    const start = getTrendStart(range)
+    const rowsRaw = await db.execute(sql`
+      select date_trunc(${unit}, "createdAt")::date::text as bucket, count(*)::int as count
+      from ${sql.raw(tableName)}
+      where "createdAt" >= ${start.toISOString()}::timestamp
+      group by bucket
+      order by bucket
+    `)
+    const rows: Array<{ bucket: string; count: number }> =
+      'rows' in (rowsRaw as any) ? (rowsRaw as any).rows : (rowsRaw as any)
+    const counts = new Map<string, number>()
+    for (const row of rows || []) {
+      const key = range === 'monthly' ? String(row.bucket).slice(0, 7) : String(row.bucket).slice(0, 10)
+      counts.set(key, Number(row.count || 0))
+    }
+
+    result[range] = Array.from({ length: points }, (_, index) => {
+      const date = addTrendUnit(start, range, index)
+      const key = getTrendKey(date, range)
+      return {
+        label: getTrendLabel(date, range),
+        value: counts.get(key) || 0,
+      }
+    })
+  }
+
+  return result
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -339,6 +439,14 @@ export async function GET() {
       }
     })
 
+    const [userTrend, pollTrend, slotTrend, participantTrend, voteTrend] = await Promise.all([
+      getCreatedTrend('"user"'),
+      getCreatedTrend('polls'),
+      getCreatedTrend('slots'),
+      getCreatedTrend('participants'),
+      getCreatedTrend('votes'),
+    ])
+
     const payload = {
       users: usersWithCounts,
       nonUsers: nonUserParticipants,
@@ -353,26 +461,31 @@ export async function GET() {
           seenThisWeek: Number(usersSeenThisWeekCount?.count ?? 0),
           seenThisMonth: Number(usersSeenThisMonthCount?.count ?? 0),
           scheduledDeletion: 0,
+          trend: userTrend,
         },
         polls: {
           lifetime: Number(pollsCount?.count ?? 0) + deletedStats.deletedPolls,
           active: Number(activePollsCount?.count ?? 0),
           scheduledDeletion: Number(scheduledPollsCount?.count ?? 0),
+          trend: pollTrend,
         },
         slots: {
           lifetime: Number(slotsCount?.count ?? 0) + deletedStats.deletedSlots,
           active: Number(activeSlotsCount?.count ?? 0),
           scheduledDeletion: Number(scheduledSlotsCount?.count ?? 0),
+          trend: slotTrend,
         },
         participants: {
           lifetime: Number(participantsCount?.count ?? 0) + deletedStats.deletedParticipants,
           active: Number(activeParticipantsCount?.count ?? 0),
           scheduledDeletion: Number(scheduledParticipantsCount?.count ?? 0),
+          trend: participantTrend,
         },
         votes: {
           lifetime: Number(votesCount?.count ?? 0) + deletedStats.deletedVotes,
           active: Number(activeVotesCount?.count ?? 0),
           scheduledDeletion: Number(scheduledVotesCount?.count ?? 0),
+          trend: voteTrend,
         },
       },
       topSlots,

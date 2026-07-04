@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 - 2026-07-04
+
+### Added
+- Add compact admin dashboard trend graphs for users, polls, slots, participants, and votes.
+- Add daily, weekly, and monthly graph views for admin metric cards.
+
 ## v1.2.0 - 2026-07-03
 
 ### Added

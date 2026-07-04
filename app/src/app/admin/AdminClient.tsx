@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Ban, ExternalLink, Lock, Trash2, Unlock } from 'lucide-react'
 
@@ -41,6 +42,13 @@ type AdminStats = {
   votes: AdminMetricStats
 }
 
+type TrendRange = 'daily' | 'weekly' | 'monthly'
+
+type TrendPoint = {
+  label: string
+  value: number
+}
+
 type AdminMetricStats = {
   lifetime: number
   active: number
@@ -49,12 +57,53 @@ type AdminMetricStats = {
   seenThisWeek?: number
   seenThisMonth?: number
   scheduledDeletion: number
+  trend: Record<TrendRange, TrendPoint[]>
 }
 
 type AdminNonUser = {
   email: string
   name: string | null
   pollsVoted: number
+}
+
+function MetricChart({
+  label,
+  range,
+  points,
+}: {
+  label: string
+  range: TrendRange
+  points: TrendPoint[]
+}) {
+  const maxValue = Math.max(...points.map((point) => point.value), 0)
+  const total = points.reduce((sum, point) => sum + point.value, 0)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <span>New {label.toLowerCase()}</span>
+        <span className="font-medium text-foreground">{total}</span>
+      </div>
+      <div className="flex h-16 items-end gap-1">
+        {points.map((point, index) => {
+          const height = maxValue > 0 ? Math.max(8, Math.round((point.value / maxValue) * 64)) : 2
+          const showLabel = index === 0 || index === points.length - 1
+          return (
+            <div key={`${range}-${point.label}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+              <div
+                className="w-full rounded-sm bg-primary/70 transition-colors hover:bg-primary"
+                style={{ height }}
+                title={`${point.label}: ${point.value}`}
+              />
+              <span className="h-3 max-w-full truncate text-[10px] leading-3 text-muted-foreground">
+                {showLabel ? point.label : ''}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export function AdminClient({ data }: { data: string }) {
@@ -73,6 +122,7 @@ export function AdminClient({ data }: { data: string }) {
   const [pollQuery, setPollQuery] = useState('')
   const [pollOwnerQuery, setPollOwnerQuery] = useState('')
   const [pollStatusFilter, setPollStatusFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
+  const [trendRange, setTrendRange] = useState<TrendRange>('daily')
 
   const getDaysUntilDeletion = (closedAt: string | null): number | null => {
     if (!closedAt) return null
@@ -149,16 +199,39 @@ export function AdminClient({ data }: { data: string }) {
     })
   }, [polls, pollQuery, pollOwnerQuery, pollStatusFilter])
 
+  const metricCards = [
+    { label: 'Users', activeLabel: 'Active', value: stats.users },
+    { label: 'Polls', activeLabel: 'Active', value: stats.polls },
+    { label: 'Slots', activeLabel: 'Active', value: stats.slots },
+    { label: 'Participants', activeLabel: 'Active', value: stats.participants },
+    { label: 'Votes', activeLabel: 'Active', value: stats.votes },
+  ]
+
   return (
     <div className="space-y-8">
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-md border bg-background p-1">
+          {[
+            { value: 'daily', label: 'Daily' },
+            { value: 'weekly', label: 'Weekly' },
+            { value: 'monthly', label: 'Monthly' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={cn(
+                'h-8 rounded px-3 text-sm font-medium text-muted-foreground transition-colors',
+                trendRange === option.value && 'bg-primary text-primary-foreground shadow-sm'
+              )}
+              onClick={() => setTrendRange(option.value as TrendRange)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {[
-          { label: 'Users', activeLabel: 'Active', value: stats.users },
-          { label: 'Polls', activeLabel: 'Active', value: stats.polls },
-          { label: 'Slots', activeLabel: 'Active', value: stats.slots },
-          { label: 'Participants', activeLabel: 'Active', value: stats.participants },
-          { label: 'Votes', activeLabel: 'Active', value: stats.votes },
-        ].map((item) => (
+        {metricCards.map((item) => (
           <Card key={item.label}>
             <CardHeader>
               <CardDescription>{item.label}</CardDescription>
@@ -202,6 +275,9 @@ export function AdminClient({ data }: { data: string }) {
                 </div>
               </div>
             </CardHeader>
+            <CardContent>
+              <MetricChart label={item.label} range={trendRange} points={item.value.trend[trendRange] || []} />
+            </CardContent>
           </Card>
         ))}
       </div>
