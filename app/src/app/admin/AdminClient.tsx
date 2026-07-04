@@ -66,41 +66,46 @@ type AdminNonUser = {
   pollsVoted: number
 }
 
+const trendRangeOptions: Array<{ value: TrendRange; label: string; description: string }> = [
+  { value: 'daily', label: 'Daily', description: 'Last 14 days' },
+  { value: 'weekly', label: 'Weekly', description: 'Last 12 weeks' },
+  { value: 'monthly', label: 'Monthly', description: 'Last 12 months' },
+]
+
 function MetricChart({
-  label,
   range,
   points,
 }: {
-  label: string
   range: TrendRange
   points: TrendPoint[]
 }) {
   const maxValue = Math.max(...points.map((point) => point.value), 0)
   const total = points.reduce((sum, point) => sum + point.value, 0)
+  const rangeLabel = trendRangeOptions.find((option) => option.value === range)?.description || ''
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>New {label.toLowerCase()}</span>
+        <span>Created</span>
         <span className="font-medium text-foreground">{total}</span>
       </div>
-      <div className="flex h-16 items-end gap-1">
-        {points.map((point, index) => {
-          const height = maxValue > 0 ? Math.max(8, Math.round((point.value / maxValue) * 64)) : 2
-          const showLabel = index === 0 || index === points.length - 1
+      <div className="flex h-14 items-end gap-1.5 rounded-md bg-muted/30 px-1.5 pb-1.5 pt-2">
+        {points.map((point) => {
+          const height = maxValue > 0 ? Math.max(6, Math.round((point.value / maxValue) * 44)) : 3
           return (
-            <div key={`${range}-${point.label}-${index}`} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+            <div key={`${range}-${point.label}`} className="flex h-11 min-w-0 flex-1 items-end">
               <div
-                className="w-full rounded-sm bg-primary/70 transition-colors hover:bg-primary"
+                className="w-full rounded-sm bg-primary/65 transition-colors hover:bg-primary"
                 style={{ height }}
                 title={`${point.label}: ${point.value}`}
               />
-              <span className="h-3 max-w-full truncate text-[10px] leading-3 text-muted-foreground">
-                {showLabel ? point.label : ''}
-              </span>
             </div>
           )
         })}
+      </div>
+      <div className="flex items-center justify-between gap-3 text-[11px] leading-4 text-muted-foreground">
+        <span>{rangeLabel}</span>
+        <span title="These bars use each record's createdAt timestamp.">createdAt</span>
       </div>
     </div>
   )
@@ -211,11 +216,7 @@ export function AdminClient({ data }: { data: string }) {
     <div className="space-y-8">
       <div className="flex justify-end">
         <div className="inline-flex rounded-md border bg-background p-1">
-          {[
-            { value: 'daily', label: 'Daily' },
-            { value: 'weekly', label: 'Weekly' },
-            { value: 'monthly', label: 'Monthly' },
-          ].map((option) => (
+          {trendRangeOptions.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -223,7 +224,7 @@ export function AdminClient({ data }: { data: string }) {
                 'h-8 rounded px-3 text-sm font-medium text-muted-foreground transition-colors',
                 trendRange === option.value && 'bg-primary text-primary-foreground shadow-sm'
               )}
-              onClick={() => setTrendRange(option.value as TrendRange)}
+              onClick={() => setTrendRange(option.value)}
             >
               {option.label}
             </button>
@@ -232,8 +233,8 @@ export function AdminClient({ data }: { data: string }) {
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {metricCards.map((item) => (
-          <Card key={item.label}>
-            <CardHeader>
+          <Card key={item.label} className="overflow-hidden">
+            <CardHeader className="pb-4">
               <CardDescription>{item.label}</CardDescription>
               <CardTitle className="text-2xl">{item.value.lifetime}</CardTitle>
               <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
@@ -275,8 +276,8 @@ export function AdminClient({ data }: { data: string }) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <MetricChart label={item.label} range={trendRange} points={item.value.trend[trendRange] || []} />
+            <CardContent className="border-t px-6 pb-5 pt-4">
+              <MetricChart range={trendRange} points={item.value.trend[trendRange] || []} />
             </CardContent>
           </Card>
         ))}

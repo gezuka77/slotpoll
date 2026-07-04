@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.2 - 2026-07-04
+
+### Changed
+- Improve admin dashboard trend graph readability in compact metric cards.
+- Clarify that admin trend graphs show created records from `createdAt`, not user activity tracking.
+
 ## v1.2.1 - 2026-07-04
 
 ### Added
