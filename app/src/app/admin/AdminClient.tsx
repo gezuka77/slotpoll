@@ -234,7 +234,7 @@ export function AdminClient({ data }: { data: string }) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {metricCards.map((item) => (
           <Card key={item.label} className="overflow-hidden">
-            <CardHeader className="pb-4">
+            <CardHeader className="pb-4 md:h-[300px]">
               <CardDescription>{item.label}</CardDescription>
               <CardTitle className="text-2xl">{item.value.lifetime}</CardTitle>
               <div className="mt-3 grid gap-1 text-xs text-muted-foreground">

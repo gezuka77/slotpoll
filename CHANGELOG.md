@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.3 - 2026-07-05
+
+### Fixed
+- Align admin dashboard trend graphs to the same vertical position across metric cards.
+
 ## v1.2.2 - 2026-07-04
 
 ### Changed
