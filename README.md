@@ -162,6 +162,7 @@ The admin dashboard separates aggregate statistics from retained personal data:
 - **Seen today / this week / this month**: Active users whose latest authenticated activity happened in that UTC period.
 - **Scheduled deletion**: Closed polls and their associated slots, participants, and votes that are waiting for the 30-day deletion timer.
 - **Trend graphs**: Compact daily, weekly, and monthly created-record graphs for users, polls, slots, participants, and votes. These graphs use each record's `createdAt` timestamp; user activity is tracked separately through `lastSeenAt`.
+- **Overview tables**: Users, demo participants, external participants, and polls are shown in compact sortable tables with pagination.
 
 Detailed admin lists show only currently retained records and do not keep deleted poll, participant, or voter details.
 

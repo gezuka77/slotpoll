@@ -252,6 +252,7 @@ export async function GET() {
           role: user.role,
           suspended: user.suspended,
           lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
+          createdAt: user.createdAt.toISOString(),
           pollsCount: Number(pollsCreated?.count ?? 0),
           votesCount: votesCountValue,
         }
@@ -302,7 +303,7 @@ export async function GET() {
     const demoPoll = await db.query.polls.findFirst({
       where: eq(polls.uniqueLink, 'demo'),
     })
-    let demoParticipants: { email: string; name: string | null; pollsVoted: number; lastSeen: Date }[] = []
+    let demoParticipants: { email: string; name: string | null; pollsVoted: number; lastSeenAt: string }[] = []
     if (demoPoll) {
       const demoRows = await db.query.participants.findMany({
         where: eq(participants.pollId, demoPoll.id),
@@ -336,7 +337,7 @@ export async function GET() {
           email: entry.email,
           name: entry.name,
           pollsVoted: 1,
-          lastSeen: entry.lastSeen,
+          lastSeenAt: entry.lastSeen.toISOString(),
         }))
     }
     const demoEmails = new Set(demoParticipants.map((entry) => entry.email.toLowerCase()))
@@ -349,6 +350,7 @@ export async function GET() {
         email: entry.email,
         name: entry.name,
         pollsVoted: entry.pollIds.size,
+        lastSeenAt: entry.lastSeen.toISOString(),
       }))
 
     const pollsForAdmin = pollRows.map((poll) => ({
@@ -363,6 +365,7 @@ export async function GET() {
       votesCount: pollVotesMap.get(poll.id) || 0,
       closedAt: poll.closedAt ? poll.closedAt.toISOString() : null,
       autoClosedAt: poll.autoClosedAt ? poll.autoClosedAt.toISOString() : null,
+      createdAt: poll.createdAt.toISOString(),
     }))
 
     const topSlotsRaw = await db.execute(sql`

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.4 - 2026-07-23
+
+### Changed
+- Replace long admin user, participant, and poll lists with compact sortable tables.
+- Add pagination and shared page-size controls for admin overview tables.
+
 ## v1.2.3 - 2026-07-05
 
 ### Fixed

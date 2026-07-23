@@ -16,6 +16,7 @@ type AdminUser = {
   role: 'super_user' | 'admin' | 'normal'
   suspended: boolean
   lastSeenAt: string | null
+  createdAt: string
   pollsCount: number
   votesCount: number
 }
@@ -32,6 +33,7 @@ type AdminPoll = {
   votesCount: number
   closedAt: string | null
   autoClosedAt: string | null
+  createdAt: string
 }
 
 type AdminStats = {
@@ -64,7 +66,13 @@ type AdminNonUser = {
   email: string
   name: string | null
   pollsVoted: number
+  lastSeenAt: string | null
 }
+
+type SortDirection = 'asc' | 'desc'
+type UserSort = 'name' | 'email' | 'role' | 'lastSeen' | 'created' | 'polls' | 'votes'
+type ParticipantSort = 'name' | 'email' | 'lastSeen' | 'pollsVoted'
+type PollSort = 'title' | 'owner' | 'status' | 'created' | 'slots' | 'participants' | 'votes' | 'deletion'
 
 const trendRangeOptions: Array<{ value: TrendRange; label: string; description: string }> = [
   { value: 'daily', label: 'Daily', description: 'Last 14 days' },
@@ -111,6 +119,110 @@ function MetricChart({
   )
 }
 
+function compareText(a: string | null | undefined, b: string | null | undefined) {
+  return (a || '').localeCompare(b || '', undefined, { sensitivity: 'base' })
+}
+
+function compareNumber(a: number, b: number) {
+  return a - b
+}
+
+function dateTime(value: string | null | undefined) {
+  if (!value) return 0
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function applyDirection(value: number, direction: SortDirection) {
+  return direction === 'asc' ? value : -value
+}
+
+function SortHeader({
+  label,
+  active,
+  direction,
+  onClick,
+  align = 'left',
+}: {
+  label: string
+  active: boolean
+  direction: SortDirection
+  onClick: () => void
+  align?: 'left' | 'right'
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex w-full items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground',
+        align === 'right' && 'justify-end text-right'
+      )}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      <span className="w-8 text-[10px]">{active ? direction : ''}</span>
+    </button>
+  )
+}
+
+function PaginationControls({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number
+  pageSize: number
+  total: number
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: number) => void
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const end = Math.min(total, currentPage * pageSize)
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
+      <div>
+        Showing {start}-{end} of {total}
+      </div>
+      <div className="flex items-center gap-2">
+        <select
+          className="h-9 rounded-md border bg-background px-2 text-sm"
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        >
+          <option value={25}>25 rows</option>
+          <option value={50}>50 rows</option>
+          <option value={100}>100 rows</option>
+        </select>
+        <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
+          Previous
+        </Button>
+        <span className="min-w-16 text-center text-xs">
+          {currentPage} / {pageCount}
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={currentPage >= pageCount}
+          onClick={() => onPageChange(currentPage + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function paginate<T>(items: T[], page: number, pageSize: number) {
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  return items.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+}
+
 export function AdminClient({ data }: { data: string }) {
   const parsed = JSON.parse(data) as {
     users: AdminUser[]
@@ -128,6 +240,27 @@ export function AdminClient({ data }: { data: string }) {
   const [pollOwnerQuery, setPollOwnerQuery] = useState('')
   const [pollStatusFilter, setPollStatusFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
   const [trendRange, setTrendRange] = useState<TrendRange>('daily')
+  const [pageSize, setPageSize] = useState(25)
+  const [userPage, setUserPage] = useState(1)
+  const [demoParticipantPage, setDemoParticipantPage] = useState(1)
+  const [participantPage, setParticipantPage] = useState(1)
+  const [pollPage, setPollPage] = useState(1)
+  const [userSort, setUserSort] = useState<{ key: UserSort; direction: SortDirection }>({
+    key: 'lastSeen',
+    direction: 'desc',
+  })
+  const [demoParticipantSort, setDemoParticipantSort] = useState<{
+    key: ParticipantSort
+    direction: SortDirection
+  }>({ key: 'lastSeen', direction: 'desc' })
+  const [participantSort, setParticipantSort] = useState<{ key: ParticipantSort; direction: SortDirection }>({
+    key: 'lastSeen',
+    direction: 'desc',
+  })
+  const [pollSort, setPollSort] = useState<{ key: PollSort; direction: SortDirection }>({
+    key: 'created',
+    direction: 'desc',
+  })
 
   const getDaysUntilDeletion = (closedAt: string | null): number | null => {
     if (!closedAt) return null
@@ -173,36 +306,147 @@ export function AdminClient({ data }: { data: string }) {
     }
   }
 
-  const filteredUsers = useMemo(() => {
+  const setSharedPageSize = (nextPageSize: number) => {
+    setPageSize(nextPageSize)
+    setUserPage(1)
+    setDemoParticipantPage(1)
+    setParticipantPage(1)
+    setPollPage(1)
+  }
+
+  const toggleUserSort = (key: UserSort) => {
+    setUserPage(1)
+    setUserSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const toggleDemoParticipantSort = (key: ParticipantSort) => {
+    setDemoParticipantPage(1)
+    setDemoParticipantSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const toggleParticipantSort = (key: ParticipantSort) => {
+    setParticipantPage(1)
+    setParticipantSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const togglePollSort = (key: PollSort) => {
+    setPollPage(1)
+    setPollSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortedUsers = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
-    return users.filter((user) => {
-      if (userRoleFilter === 'suspended' && !user.suspended) return false
-      if (userRoleFilter === 'online' && !isOnline(user.lastSeenAt)) return false
-      if (userRoleFilter === 'super_user' && user.role !== 'super_user') return false
-      if (userRoleFilter === 'normal' && user.role !== 'normal') return false
+    return users
+      .filter((user) => {
+        if (userRoleFilter === 'suspended' && !user.suspended) return false
+        if (userRoleFilter === 'online' && !isOnline(user.lastSeenAt)) return false
+        if (userRoleFilter === 'super_user' && user.role !== 'super_user') return false
+        if (userRoleFilter === 'normal' && user.role !== 'normal') return false
 
-      if (!query) return true
-      const haystack = `${user.name || ''} ${user.email || ''}`.toLowerCase()
-      return haystack.includes(query)
+        if (!query) return true
+        const haystack = `${user.name || ''} ${user.email || ''}`.toLowerCase()
+        return haystack.includes(query)
+      })
+      .sort((a, b) => {
+        const compare =
+          userSort.key === 'name'
+            ? compareText(a.name, b.name)
+            : userSort.key === 'email'
+              ? compareText(a.email, b.email)
+              : userSort.key === 'role'
+                ? compareText(a.role, b.role)
+                : userSort.key === 'lastSeen'
+                  ? compareNumber(dateTime(a.lastSeenAt), dateTime(b.lastSeenAt))
+                  : userSort.key === 'created'
+                    ? compareNumber(dateTime(a.createdAt), dateTime(b.createdAt))
+                    : userSort.key === 'polls'
+                      ? compareNumber(a.pollsCount, b.pollsCount)
+                      : compareNumber(a.votesCount, b.votesCount)
+        return applyDirection(compare, userSort.direction)
+      })
+  }, [users, userQuery, userRoleFilter, userSort])
+
+  const sortedDemoParticipants = useMemo(() => {
+    return [...demoParticipants].sort((a, b) => {
+      const compare =
+        demoParticipantSort.key === 'name'
+          ? compareText(a.name, b.name)
+          : demoParticipantSort.key === 'email'
+            ? compareText(a.email, b.email)
+            : demoParticipantSort.key === 'lastSeen'
+              ? compareNumber(dateTime(a.lastSeenAt), dateTime(b.lastSeenAt))
+              : compareNumber(a.pollsVoted, b.pollsVoted)
+      return applyDirection(compare, demoParticipantSort.direction)
     })
-  }, [users, userQuery, userRoleFilter])
+  }, [demoParticipants, demoParticipantSort])
 
-  const filteredPolls = useMemo(() => {
+  const sortedParticipants = useMemo(() => {
+    return [...nonUsers].sort((a, b) => {
+      const compare =
+        participantSort.key === 'name'
+          ? compareText(a.name, b.name)
+          : participantSort.key === 'email'
+            ? compareText(a.email, b.email)
+            : participantSort.key === 'lastSeen'
+              ? compareNumber(dateTime(a.lastSeenAt), dateTime(b.lastSeenAt))
+              : compareNumber(a.pollsVoted, b.pollsVoted)
+      return applyDirection(compare, participantSort.direction)
+    })
+  }, [nonUsers, participantSort])
+
+  const sortedPolls = useMemo(() => {
     const query = pollQuery.trim().toLowerCase()
     const ownerQuery = pollOwnerQuery.trim().toLowerCase()
-    return polls.filter((poll) => {
-      if (pollStatusFilter !== 'all' && poll.status !== pollStatusFilter) return false
-      if (query) {
-        const text = `${poll.title}`.toLowerCase()
-        if (!text.includes(query)) return false
-      }
-      if (ownerQuery) {
-        const owner = `${poll.creatorName || ''} ${poll.creatorEmail || ''}`.toLowerCase()
-        if (!owner.includes(ownerQuery)) return false
-      }
-      return true
-    })
-  }, [polls, pollQuery, pollOwnerQuery, pollStatusFilter])
+    return polls
+      .filter((poll) => {
+        if (pollStatusFilter !== 'all' && poll.status !== pollStatusFilter) return false
+        if (query) {
+          const text = `${poll.title}`.toLowerCase()
+          if (!text.includes(query)) return false
+        }
+        if (ownerQuery) {
+          const owner = `${poll.creatorName || ''} ${poll.creatorEmail || ''}`.toLowerCase()
+          if (!owner.includes(ownerQuery)) return false
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const compare =
+          pollSort.key === 'title'
+            ? compareText(a.title, b.title)
+            : pollSort.key === 'owner'
+              ? compareText(a.creatorName || a.creatorEmail, b.creatorName || b.creatorEmail)
+              : pollSort.key === 'status'
+                ? compareText(a.status, b.status)
+                : pollSort.key === 'created'
+                  ? compareNumber(dateTime(a.createdAt), dateTime(b.createdAt))
+                  : pollSort.key === 'slots'
+                    ? compareNumber(a.slotsCount, b.slotsCount)
+                    : pollSort.key === 'participants'
+                      ? compareNumber(a.participantsCount, b.participantsCount)
+                      : pollSort.key === 'votes'
+                        ? compareNumber(a.votesCount, b.votesCount)
+                        : compareNumber(getDaysUntilDeletion(a.closedAt) ?? Number.MAX_SAFE_INTEGER, getDaysUntilDeletion(b.closedAt) ?? Number.MAX_SAFE_INTEGER)
+        return applyDirection(compare, pollSort.direction)
+      })
+  }, [polls, pollQuery, pollOwnerQuery, pollStatusFilter, pollSort])
+
+  const paginatedUsers = paginate(sortedUsers, userPage, pageSize)
+  const paginatedDemoParticipants = paginate(sortedDemoParticipants, demoParticipantPage, pageSize)
+  const paginatedParticipants = paginate(sortedParticipants, participantPage, pageSize)
+  const paginatedPolls = paginate(sortedPolls, pollPage, pageSize)
 
   const metricCards = [
     { label: 'Users', activeLabel: 'Active', value: stats.users },
@@ -293,13 +537,19 @@ export function AdminClient({ data }: { data: string }) {
             <Input
               placeholder="Search name or email"
               value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
+              onChange={(e) => {
+                setUserPage(1)
+                setUserQuery(e.target.value)
+              }}
               className="max-w-xs"
             />
             <select
               className="h-10 rounded-md border bg-background px-3 text-sm"
               value={userRoleFilter}
-              onChange={(e) => setUserRoleFilter(e.target.value as typeof userRoleFilter)}
+              onChange={(e) => {
+                setUserPage(1)
+                setUserRoleFilter(e.target.value as typeof userRoleFilter)
+              }}
             >
               <option value="all">All roles</option>
               <option value="super_user">Super users</option>
@@ -308,114 +558,142 @@ export function AdminClient({ data }: { data: string }) {
               <option value="online">Online now</option>
             </select>
           </div>
-          <div className="grid gap-3">
-            {filteredUsers.map((user) => (
-              <div
-                key={user.id}
-                className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px_minmax(260px,auto)] md:items-center"
-              >
-                <div>
-                  <div className="font-medium">{user.name || 'No name'}</div>
-                  <div className="text-xs text-muted-foreground">{user.email || 'No email'}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Last seen: {formatLastSeen(user.lastSeenAt)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground md:text-center">
-                  {user.pollsCount} polls • {user.votesCount} polls voted
-                </div>
-                <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
-                  <span
-                    className={[
-                      'rounded-full border px-2 py-1 text-xs',
-                      user.role === 'super_user' && 'border-purple-200 bg-purple-50 text-purple-700',
-                      user.role === 'admin' && 'border-blue-200 bg-blue-50 text-blue-700',
-                      user.role === 'normal' && 'border-slate-200 bg-slate-50 text-slate-700',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    {user.role}
-                  </span>
-                  {user.suspended && (
-                    <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
-                      suspended
-                    </span>
-                  )}
-                  {isOnline(user.lastSeenAt) && !user.suspended && (
-                    <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-700">
-                      online
-                    </span>
-                  )}
-                  {user.role !== 'super_user' && user.role !== 'normal' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy === `role-${user.id}`}
-                      onClick={() =>
-                        mutate(
-                          `role-${user.id}`,
-                          () =>
-                            fetch(`/api/admin/users/${user.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ role: 'normal' }),
-                            }),
-                          'Set user to normal role?'
-                        )
-                      }
-                    >
-                      Make normal
-                    </Button>
-                  )}
-                  {user.role !== 'super_user' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={
-                        user.suspended
-                          ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
-                          : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
-                      }
-                      disabled={busy === `suspend-${user.id}`}
-                      onClick={() =>
-                        mutate(
-                          `suspend-${user.id}`,
-                          () =>
-                            fetch(`/api/admin/users/${user.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ suspended: !user.suspended }),
-                            }),
-                          user.suspended ? 'Unsuspend this user?' : 'Suspend this user?'
-                        )
-                      }
-                    >
-                      <Ban className="mr-2 h-4 w-4" />
-                      {user.suspended ? 'Unsuspend' : 'Suspend'}
-                    </Button>
-                  )}
-                  {user.role !== 'super_user' && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={busy === `delete-${user.id}`}
-                      onClick={() =>
-                        mutate(
-                          `delete-${user.id}`,
-                          () => fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }),
-                          'Delete this user and all their polls/votes?'
-                        )
-                      }
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead className="bg-muted/40">
+                <tr className="border-b">
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Name" active={userSort.key === 'name'} direction={userSort.direction} onClick={() => toggleUserSort('name')} />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Email" active={userSort.key === 'email'} direction={userSort.direction} onClick={() => toggleUserSort('email')} />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Role" active={userSort.key === 'role'} direction={userSort.direction} onClick={() => toggleUserSort('role')} />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Last seen" active={userSort.key === 'lastSeen'} direction={userSort.direction} onClick={() => toggleUserSort('lastSeen')} />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <SortHeader label="Polls" active={userSort.key === 'polls'} direction={userSort.direction} onClick={() => toggleUserSort('polls')} align="right" />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <SortHeader label="Voted" active={userSort.key === 'votes'} direction={userSort.direction} onClick={() => toggleUserSort('votes')} align="right" />
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUsers.map((user) => (
+                  <tr key={user.id} className="border-b last:border-0">
+                    <td className="px-3 py-2 font-medium">{user.name || 'No name'}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{user.email || 'No email'}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        <span
+                          className={cn(
+                            'rounded-full border px-2 py-1 text-xs',
+                            user.role === 'super_user' && 'border-purple-200 bg-purple-50 text-purple-700',
+                            user.role === 'admin' && 'border-blue-200 bg-blue-50 text-blue-700',
+                            user.role === 'normal' && 'border-slate-200 bg-slate-50 text-slate-700'
+                          )}
+                        >
+                          {user.role}
+                        </span>
+                        {user.suspended && (
+                          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700">
+                            suspended
+                          </span>
+                        )}
+                        {isOnline(user.lastSeenAt) && !user.suspended && (
+                          <span className="rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-700">
+                            online
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{formatLastSeen(user.lastSeenAt)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{user.pollsCount}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{user.votesCount}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex justify-end gap-2">
+                        {user.role !== 'super_user' && user.role !== 'normal' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy === `role-${user.id}`}
+                            onClick={() =>
+                              mutate(
+                                `role-${user.id}`,
+                                () =>
+                                  fetch(`/api/admin/users/${user.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ role: 'normal' }),
+                                  }),
+                                'Set user to normal role?'
+                              )
+                            }
+                          >
+                            Normal
+                          </Button>
+                        )}
+                        {user.role !== 'super_user' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={
+                              user.suspended
+                                ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                                : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
+                            }
+                            disabled={busy === `suspend-${user.id}`}
+                            onClick={() =>
+                              mutate(
+                                `suspend-${user.id}`,
+                                () =>
+                                  fetch(`/api/admin/users/${user.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ suspended: !user.suspended }),
+                                  }),
+                                user.suspended ? 'Unsuspend this user?' : 'Suspend this user?'
+                              )
+                            }
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {user.role !== 'super_user' && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={busy === `delete-${user.id}`}
+                            onClick={() =>
+                              mutate(
+                                `delete-${user.id}`,
+                                () => fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' }),
+                                'Delete this user and all their polls/votes?'
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          <PaginationControls
+            page={userPage}
+            pageSize={pageSize}
+            total={sortedUsers.length}
+            onPageChange={setUserPage}
+            onPageSizeChange={setSharedPageSize}
+          />
         </CardContent>
       </Card>
 
@@ -428,22 +706,45 @@ export function AdminClient({ data }: { data: string }) {
           {demoParticipants.length === 0 ? (
             <div className="text-sm text-muted-foreground">No demo participants yet.</div>
           ) : (
-            <div className="grid gap-3">
-              {demoParticipants.map((participant) => (
-                <div
-                  key={`demo-${participant.email}`}
-                  className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px] md:items-center"
-                >
-                  <div>
-                    <div className="font-medium">{participant.name || 'No name'}</div>
-                    <div className="text-xs text-muted-foreground">{participant.email}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground md:text-center">
-                    {participant.pollsVoted} polls voted
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="border-b">
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Name" active={demoParticipantSort.key === 'name'} direction={demoParticipantSort.direction} onClick={() => toggleDemoParticipantSort('name')} />
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Email" active={demoParticipantSort.key === 'email'} direction={demoParticipantSort.direction} onClick={() => toggleDemoParticipantSort('email')} />
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Last response" active={demoParticipantSort.key === 'lastSeen'} direction={demoParticipantSort.direction} onClick={() => toggleDemoParticipantSort('lastSeen')} />
+                      </th>
+                      <th className="px-3 py-2 text-right">
+                        <SortHeader label="Polls voted" active={demoParticipantSort.key === 'pollsVoted'} direction={demoParticipantSort.direction} onClick={() => toggleDemoParticipantSort('pollsVoted')} align="right" />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedDemoParticipants.map((participant) => (
+                      <tr key={`demo-${participant.email}`} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-medium">{participant.name || 'No name'}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{participant.email}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatLastSeen(participant.lastSeenAt)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{participant.pollsVoted}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <PaginationControls
+                page={demoParticipantPage}
+                pageSize={pageSize}
+                total={sortedDemoParticipants.length}
+                onPageChange={setDemoParticipantPage}
+                onPageSizeChange={setSharedPageSize}
+              />
+            </>
           )}
         </CardContent>
       </Card>
@@ -457,22 +758,45 @@ export function AdminClient({ data }: { data: string }) {
           {nonUsers.length === 0 ? (
             <div className="text-sm text-muted-foreground">No external participants yet.</div>
           ) : (
-            <div className="grid gap-3">
-              {nonUsers.map((participant) => (
-                <div
-                  key={participant.email}
-                  className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(220px,1fr)_160px] md:items-center"
-                >
-                  <div>
-                    <div className="font-medium">{participant.name || 'No name'}</div>
-                    <div className="text-xs text-muted-foreground">{participant.email}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground md:text-center">
-                    {participant.pollsVoted} polls voted
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="border-b">
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Name" active={participantSort.key === 'name'} direction={participantSort.direction} onClick={() => toggleParticipantSort('name')} />
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Email" active={participantSort.key === 'email'} direction={participantSort.direction} onClick={() => toggleParticipantSort('email')} />
+                      </th>
+                      <th className="px-3 py-2 text-left">
+                        <SortHeader label="Last response" active={participantSort.key === 'lastSeen'} direction={participantSort.direction} onClick={() => toggleParticipantSort('lastSeen')} />
+                      </th>
+                      <th className="px-3 py-2 text-right">
+                        <SortHeader label="Polls voted" active={participantSort.key === 'pollsVoted'} direction={participantSort.direction} onClick={() => toggleParticipantSort('pollsVoted')} align="right" />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedParticipants.map((participant) => (
+                      <tr key={participant.email} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-medium">{participant.name || 'No name'}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{participant.email}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatLastSeen(participant.lastSeenAt)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{participant.pollsVoted}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <PaginationControls
+                page={participantPage}
+                pageSize={pageSize}
+                total={sortedParticipants.length}
+                onPageChange={setParticipantPage}
+                onPageSizeChange={setSharedPageSize}
+              />
+            </>
           )}
         </CardContent>
       </Card>
@@ -487,19 +811,28 @@ export function AdminClient({ data }: { data: string }) {
             <Input
               placeholder="Search title"
               value={pollQuery}
-              onChange={(e) => setPollQuery(e.target.value)}
+              onChange={(e) => {
+                setPollPage(1)
+                setPollQuery(e.target.value)
+              }}
               className="max-w-xs"
             />
             <Input
               placeholder="Filter owner"
               value={pollOwnerQuery}
-              onChange={(e) => setPollOwnerQuery(e.target.value)}
+              onChange={(e) => {
+                setPollPage(1)
+                setPollOwnerQuery(e.target.value)
+              }}
               className="max-w-xs"
             />
             <select
               className="h-10 rounded-md border bg-background px-3 text-sm"
               value={pollStatusFilter}
-              onChange={(e) => setPollStatusFilter(e.target.value as typeof pollStatusFilter)}
+              onChange={(e) => {
+                setPollPage(1)
+                setPollStatusFilter(e.target.value as typeof pollStatusFilter)
+              }}
             >
               <option value="all">All statuses</option>
               <option value="active">Active</option>
@@ -507,121 +840,147 @@ export function AdminClient({ data }: { data: string }) {
               <option value="draft">Draft</option>
             </select>
           </div>
-          <div className="grid gap-3">
-            {filteredPolls.map((poll) => (
-              <div key={poll.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-                <div className="min-w-[240px]">
-                  <div className="font-medium">{poll.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {poll.creatorName || poll.creatorEmail || 'Unknown owner'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {poll.slotsCount} slots • {poll.participantsCount} responses • {poll.votesCount} votes
-                  </div>
-                  {poll.status === 'closed' && poll.closedAt && (
-                    <div className="mt-1 text-xs">
-                      {(() => {
-                        const daysRemaining = getDaysUntilDeletion(poll.closedAt)
-                        if (daysRemaining === null) return null
-                        if (daysRemaining <= 0) {
-                          return <span className="text-red-600 font-medium">⚠️ Deletion pending</span>
-                        }
-                        return (
-                          <div className="flex flex-col gap-1">
-                            {poll.autoClosedAt && (
-                              <span className="text-amber-700 font-medium">
-                                Automatically closed after all times passed
-                              </span>
-                            )}
-                            <span className={daysRemaining <= 7 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
-                              🗑️ Auto-delete in {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
-                            </span>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[1120px] text-sm">
+              <thead className="bg-muted/40">
+                <tr className="border-b">
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Title" active={pollSort.key === 'title'} direction={pollSort.direction} onClick={() => togglePollSort('title')} />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Owner" active={pollSort.key === 'owner'} direction={pollSort.direction} onClick={() => togglePollSort('owner')} />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Status" active={pollSort.key === 'status'} direction={pollSort.direction} onClick={() => togglePollSort('status')} />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <SortHeader label="Slots" active={pollSort.key === 'slots'} direction={pollSort.direction} onClick={() => togglePollSort('slots')} align="right" />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <SortHeader label="Responses" active={pollSort.key === 'participants'} direction={pollSort.direction} onClick={() => togglePollSort('participants')} align="right" />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <SortHeader label="Votes" active={pollSort.key === 'votes'} direction={pollSort.direction} onClick={() => togglePollSort('votes')} align="right" />
+                  </th>
+                  <th className="px-3 py-2 text-left">
+                    <SortHeader label="Deletion" active={pollSort.key === 'deletion'} direction={pollSort.direction} onClick={() => togglePollSort('deletion')} />
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedPolls.map((poll) => {
+                  const daysRemaining = getDaysUntilDeletion(poll.closedAt)
+                  return (
+                    <tr key={poll.id} className="border-b last:border-0">
+                      <td className="max-w-[260px] px-3 py-2">
+                        <div className="truncate font-medium" title={poll.title}>{poll.title}</div>
+                        <div className="text-xs text-muted-foreground">{new Date(poll.createdAt).toLocaleDateString()}</div>
+                      </td>
+                      <td className="max-w-[220px] px-3 py-2 text-muted-foreground">
+                        <div className="truncate" title={poll.creatorName || poll.creatorEmail || 'Unknown owner'}>
+                          {poll.creatorName || poll.creatorEmail || 'Unknown owner'}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={cn(
+                            'rounded-full border px-2 py-1 text-xs',
+                            poll.status === 'active' && 'border-green-200 bg-green-50 text-green-700',
+                            poll.status === 'closed' && 'border-slate-200 bg-slate-50 text-slate-700',
+                            poll.status === 'draft' && 'border-amber-200 bg-amber-50 text-amber-700'
+                          )}
+                        >
+                          {poll.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{poll.slotsCount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{poll.participantsCount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{poll.votesCount}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {poll.status !== 'closed' || !poll.closedAt ? (
+                          'Not scheduled'
+                        ) : daysRemaining === null ? (
+                          'Not scheduled'
+                        ) : daysRemaining <= 0 ? (
+                          <span className="font-medium text-red-600">Deletion pending</span>
+                        ) : (
+                          <div>
+                            <div className={daysRemaining <= 7 ? 'font-medium text-amber-600' : ''}>
+                              {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                            </div>
+                            {poll.autoClosedAt && <div className="text-amber-700">Auto-closed</div>}
                           </div>
-                        )
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={[
-                      'rounded-full border px-2 py-1 text-xs',
-                      poll.status === 'active' && 'border-green-200 bg-green-50 text-green-700',
-                      poll.status === 'closed' && 'border-slate-200 bg-slate-50 text-slate-700',
-                      poll.status === 'draft' && 'border-amber-200 bg-amber-50 text-amber-700',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    {poll.status}
-                  </span>
-                  {poll.uniqueLink !== 'demo' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={
-                        poll.status === 'closed'
-                          ? 'border-green-300 bg-green-600 text-white hover:bg-green-700'
-                          : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
-                      }
-                      disabled={busy === `status-${poll.id}`}
-                      onClick={() =>
-                        mutate(
-                          `status-${poll.id}`,
-                          () =>
-                            fetch(`/api/admin/polls/${poll.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ status: poll.status === 'closed' ? 'active' : 'closed' }),
-                            }),
-                          poll.status === 'closed' ? 'Reopen this poll?' : 'Close this poll?'
-                        )
-                      }
-                    >
-                      {poll.status === 'closed' ? (
-                        <>
-                          <Unlock className="mr-2 h-4 w-4" />
-                          Reopen
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="mr-2 h-4 w-4" />
-                          Close
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  <Link
-                    href={`/polls/${poll.uniqueLink}`}
-                    className={[
-                      buttonVariants({ variant: 'outline', size: 'sm' }),
-                      'border-green-300 bg-green-600 text-white hover:bg-green-700',
-                    ].join(' ')}
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open
-                  </Link>
-                  {poll.uniqueLink !== 'demo' && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={busy === `delete-${poll.id}`}
-                      onClick={() =>
-                        mutate(
-                          `delete-${poll.id}`,
-                          () => fetch(`/api/admin/polls/${poll.id}`, { method: 'DELETE' }),
-                          'Delete this poll and all votes?'
-                        )
-                      }
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end gap-2">
+                          {poll.uniqueLink !== 'demo' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className={
+                                poll.status === 'closed'
+                                  ? 'border-green-300 bg-green-600 text-white hover:bg-green-700'
+                                  : 'border-amber-300 bg-amber-500 text-white hover:bg-amber-600'
+                              }
+                              disabled={busy === `status-${poll.id}`}
+                              onClick={() =>
+                                mutate(
+                                  `status-${poll.id}`,
+                                  () =>
+                                    fetch(`/api/admin/polls/${poll.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ status: poll.status === 'closed' ? 'active' : 'closed' }),
+                                    }),
+                                  poll.status === 'closed' ? 'Reopen this poll?' : 'Close this poll?'
+                                )
+                              }
+                            >
+                              {poll.status === 'closed' ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                            </Button>
+                          )}
+                          <Link
+                            href={`/polls/${poll.uniqueLink}`}
+                            className={cn(
+                              buttonVariants({ variant: 'outline', size: 'sm' }),
+                              'border-green-300 bg-green-600 text-white hover:bg-green-700'
+                            )}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
+                          {poll.uniqueLink !== 'demo' && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={busy === `delete-${poll.id}`}
+                              onClick={() =>
+                                mutate(
+                                  `delete-${poll.id}`,
+                                  () => fetch(`/api/admin/polls/${poll.id}`, { method: 'DELETE' }),
+                                  'Delete this poll and all votes?'
+                                )
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
+          <PaginationControls
+            page={pollPage}
+            pageSize={pageSize}
+            total={sortedPolls.length}
+            onPageChange={setPollPage}
+            onPageSizeChange={setSharedPageSize}
+          />
         </CardContent>
       </Card>
     </div>
