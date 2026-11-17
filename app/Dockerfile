@@ -1,10 +1,10 @@
 # Development stage
-FROM node:20-alpine AS development
+FROM node:24-alpine AS development
 WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm ci --no-audit
 
 # Copy source
 COPY . .
@@ -13,15 +13,15 @@ EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 # Dependencies stage
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci --no-audit
 
 # Builder stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -33,7 +33,7 @@ ENV NEXT_FONT_GOOGLE_MOCKED 1
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 WORKDIR /app
 
 ENV NODE_ENV production

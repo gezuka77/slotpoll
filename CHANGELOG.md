@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.2.5 - 2026-11-17
+
+### Security
+- Update Next.js, React, NextAuth, Drizzle, Zod, and transitive dependencies to patched releases.
+- Move Docker builds to Node.js 24 LTS and install dependencies reproducibly with npm ci.
+- Refresh Traefik to 3.7.19 and the cleanup-container base image to Alpine 3.24.
+- Patch PostgreSQL to 16.16 and Redis to 7.4.12 without changing database schema.
+- Override vulnerable nested PostCSS and development esbuild dependencies; npm audit reports zero known vulnerabilities.
+
 ## v1.2.4 - 2026-07-23
 
 ### Changed
